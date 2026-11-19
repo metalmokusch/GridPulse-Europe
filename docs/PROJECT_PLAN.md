@@ -6,7 +6,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Implementation plan
 
-1. **Validate source and environment:** official ENTSO-E access, zone, generation semantics, rate-limit, and reuse documentation reviewed. Still pending: authorized API access, confirmation of the current query contract against a real authorized request, explicit reuse rights for item 16.1.B&C, and deployment validation.
+1. **Validate source and environment:** official ENTSO-E access, zone, generation semantics, rate-limit, and reuse documentation reviewed. Still pending: authorized API access, confirmation of the current query contract against an authorized live request, and explicit reuse rights for item 16.1.B&C. OMV deployment validation is deferred until it is useful.
 2. **Record technical choices:** initial native Node.js/demo stack is recorded in ADR 0001. Revisit framework, package manager, chart library, and database only when the next vertical slice justifies them; document each change in an ADR.
 3. **Bootstrap demo-first vertical slice:** complete. API health/readiness, synthetic fixture data, and a responsive dashboard with explicit time/unit/status and tabular fallback run without external credentials.
 4. **Build data contracts and persistence:** provider-neutral UTC observation validation, versioned taxonomy, safe renewable-share calculation, and configurable freshness classifier are implemented and covered by offline tests. Country/zone distinction is preserved. A single-instance SQLite persistence boundary is the provisional direction; package choice, migrations, adapter-owned category maps, and idempotent storage remain open (see ADR 0004).
@@ -28,11 +28,9 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 ## External dependency backlog
 
 - Obtain authorized ENTSO-E REST API access before implementing the provider adapter. Keep credentials out of the repository.
-- Keep provider credentials out of the repository and store them only in the deployment environment.
-- Obtain written reuse rights for data item 16.1.B&C before publishing API results or derived data.
+- Obtain written reuse clarification for data item 16.1.B&C before publishing API results or derived data.
 - Current live query parameters, output shape, category completeness, and resolution still require a short authorized validation request.
 
 ## Immediate next task
 
-Continue with source-independent work: extract dashboard URL-state parsing/serialization into a small testable module and cover valid/default/invalid links using the built-in Node test runner. Defer OMV deployment testing until persistent storage or live data makes it useful; do not configure a data volume before there is data to persist. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
-
+Extract dashboard URL-state parsing/serialization into a dependency-free module and add offline tests for default, valid, and invalid links. Defer OMV deployment testing until persistent storage or live data makes it useful; do not configure a data volume before there is data to persist. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
