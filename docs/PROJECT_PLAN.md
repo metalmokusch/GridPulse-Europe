@@ -18,9 +18,10 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Standalone local Git repository connected to the public `metalmokusch/GridPulse-Europe` repository.
 - First demo vertical slice implemented with native Node.js ESM, built-in HTTP, static HTML/CSS/JavaScript, synthetic HU/AT/DE fixtures, health/data endpoints, responsive dashboard, SVG chart, comparison cards, and table alternative.
 - Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs remain based on all sources.
+- Dashboard country, period, and source selections are encoded in the URL so selected views can be shared and restored.
 - Sixteen offline Node.js tests cover health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
-- The first GitHub Actions run for commit `1c4ff7c` completed successfully on 2026-11-19.
+- GitHub Actions run #7 for commit `6e39142` completed successfully on 2026-11-19 (Node.js 20/22/24 matrix and container image build).
 - Dockerfile and Compose configuration now package the fixture-only demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. GitHub Actions builds the container image. No data volume is configured before persistence exists.
 - Current official ENTSO-E data-source documentation and reuse terms are recorded in [data-sources.md](data-sources.md). Provider integration and live data queries remain gated on authorized access and reuse rights. Candidate query parameters need confirmation against current documentation.
 
@@ -33,4 +34,5 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Immediate next task
 
-Confirm how the owner wants to access the OMV demo (same-host reverse proxy or LAN) and validate the Compose image on the actual OMV host. Then select a SQLite driver and implement/test migrations and backup/restore. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
+Continue with source-independent work: extract dashboard URL-state parsing/serialization into a small testable module and cover valid/default/invalid links using the built-in Node test runner. Defer OMV deployment testing until persistent storage or live data makes it useful; do not configure a data volume before there is data to persist. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
+
