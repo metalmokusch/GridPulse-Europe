@@ -27,6 +27,40 @@ function renderPicker() {
   $('#country-picker').querySelectorAll('input').forEach((input) => input.addEventListener('change', onCountryChange));
 }
 
+function restoreDashboardState() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedCountries = (params.get('countries') ?? '').split(',').map((code) => code.trim().toUpperCase()).filter(Boolean);
+  if (requestedCountries.length && requestedCountries.length <= 3
+    && new Set(requestedCountries).size === requestedCountries.length
+    && requestedCountries.every((code) => state.countries.some((country) => country.code === code))) {
+    state.selected = requestedCountries;
+  }
+
+  const requestedHours = Number(params.get('hours'));
+  if ([6, 12, 24].includes(requestedHours)) state.periodHours = requestedHours;
+  $('#period-select').value = String(state.periodHours);
+
+  if (params.has('sources')) {
+    const requestedSources = params.get('sources').split(',').filter(Boolean);
+    if (requestedSources.length && new Set(requestedSources).size === requestedSources.length
+      && requestedSources.every((category) => Object.hasOwn(COLORS, category))) {
+      state.selectedCategories = requestedSources;
+    }
+  }
+}
+
+function syncDashboardUrl() {
+  const url = new URL(window.location.href);
+  if (state.selected.length === 1 && state.selected[0] === 'HU') url.searchParams.delete('countries');
+  else url.searchParams.set('countries', state.selected.join(','));
+  if (state.periodHours === 24) url.searchParams.delete('hours');
+  else url.searchParams.set('hours', String(state.periodHours));
+  const allSources = Object.keys(COLORS);
+  if (allSources.every((category) => state.selectedCategories.includes(category))) url.searchParams.delete('sources');
+  else url.searchParams.set('sources', allSources.filter((category) => state.selectedCategories.includes(category)).join(','));
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 function onCountryChange(event) {
   const code = event.target.value;
   const next = event.target.checked ? [...state.selected, code] : state.selected.filter((item) => item !== code);
@@ -42,6 +76,7 @@ function onCountryChange(event) {
   }
   state.selected = next;
   renderPicker();
+  syncDashboardUrl();
   loadDashboard();
 }
 
@@ -179,6 +214,7 @@ function renderCurrentDashboard() {
   renderComparison(state.latestSummary);
   renderTable(state.latestSummary);
   renderCategoryPicker();
+  syncDashboardUrl();
   $('.content-grid').hidden = false;
   $('#table-panel').hidden = false;
   $('#dashboard-content').setAttribute('aria-busy', 'false');
@@ -188,6 +224,7 @@ async function init() {
   try {
     const result = await request('/api/v1/countries');
     state.countries = result.countries;
+    restoreDashboardState();
     renderPicker();
     await loadDashboard();
   } catch (error) {
