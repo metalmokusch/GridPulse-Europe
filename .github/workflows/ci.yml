@@ -30,3 +30,14 @@ jobs:
         run: npm run check
       - name: Run offline test suite
         run: npm test
+
+  container-build:
+    name: Build container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Build demo image
+        run: docker build --tag gridpulse-europe:ci .

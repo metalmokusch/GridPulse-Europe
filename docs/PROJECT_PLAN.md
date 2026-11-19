@@ -20,6 +20,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Sixteen offline Node.js tests cover health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
 - The first GitHub Actions run for commit `1c4ff7c` completed successfully on 2026-11-19.
+- Dockerfile and Compose configuration now package the fixture-only demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. GitHub Actions builds the container image. No data volume is configured before persistence exists.
 - Current official ENTSO-E data-source documentation and reuse terms are recorded in [data-sources.md](data-sources.md). Provider integration and live data queries remain gated on authorized access and reuse rights. Candidate query parameters need confirmation against current documentation.
 
 ## External dependency backlog
@@ -31,4 +32,4 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Immediate next task
 
-Continue with source-independent operations work: confirm the OMV runtime and persistent-volume details, then select a SQLite driver and implement/test migrations and backup/restore. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
+Confirm how the owner wants to access the OMV demo (same-host reverse proxy or LAN) and validate the Compose image on the actual OMV host. Then select a SQLite driver and implement/test migrations and backup/restore. Keep provider integration, real-data fixtures, and persisted polling behind the external backlog gates above.
