@@ -15,9 +15,12 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Current state
 
-- Separate project directory created; no application code or dependencies.
+- Standalone local Git repository connected to the public `metalmokusch/GridPulse-Europe` repository.
+- First demo vertical slice implemented with native Node.js ESM, built-in HTTP, static HTML/CSS/JavaScript, synthetic HU/AT/DE fixtures, health/data endpoints, responsive dashboard, SVG chart, comparison cards, and table alternative.
+- Five offline Node.js tests cover health, country/zone metadata, UTC/unit/synthetic data contracts, renewable share arithmetic, input validation, and static asset delivery.
+- No third-party runtime dependencies or provider credentials.
 - No ENTSO-E account/token, target OMV version, or reuse terms were validated in this session.
 
 ## Immediate next task
 
-Resolve the Phase 0 source gate without exposing a token: use official ENTSO-E documentation/account flow to verify access, then document one token-free query definition (zone, document/process parameters, interval, response format) and the applicable reuse/attribution conditions. Until then, build only synthetic/demo code.
+Resolve the Phase 0 source gate without exposing a token: use official ENTSO-E documentation/account flow to verify access, then document one token-free query definition (zone, document/process parameters, interval, response format) and the applicable reuse/attribution conditions. Until that is clear, keep the adapter boundary unconnected and use only synthetic/demo data. Then expand the observation contract and fixture tests before persistence or provider integration.

@@ -1,0 +1,14 @@
+{
+  "name": "gridpulse-europe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted European electricity generation analytics demo",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

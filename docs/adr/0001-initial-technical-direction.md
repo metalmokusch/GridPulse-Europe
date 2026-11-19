@@ -1,6 +1,6 @@
 # ADR 0001: Initial technical direction
 
-- Status: provisional
+- Status: accepted for the demo bootstrap; persistence and charting remain open
 - Date: 2026-11-19
 
 ## Context
@@ -12,11 +12,13 @@ The product specification proposes TypeScript across the web and API, a demo-fir
 Adopt only these constraints for the first implementation step:
 
 - The demo must run without provider credentials or external calls.
-- Keep the UI and API in a small TypeScript-oriented structure unless bootstrap evidence favors a simpler setup.
+- Start with native Node.js ESM, built-in HTTP/filesystem APIs, static HTML/CSS/JavaScript, and `node:test`. There are no dependencies to install.
+- Use a small single-package layout for the first vertical slice. Revisit TypeScript, React, and workspaces when the project has enough domain/UI complexity to justify a build toolchain.
+- Use semantic HTML, responsive CSS, an SVG chart with a visible data-table alternative, and no chart dependency in the first slice.
 - Keep provider integration behind an adapter and domain DTO boundary.
 - Keep source-specific and normalized categories, source zones, timestamps, units, and quality explicit.
 - Defer package manager, framework, chart library, database, polling cadence, and live provider implementation until their validation tasks are completed.
 
 ## Consequences
 
-This avoids locking the project into unverified dependencies or implying that public data can be redistributed. The first code increment should be synthetic fixtures plus a thin health/data API and UI only after the package/licensing decisions are reviewed.
+This avoids locking the project into unverified dependencies or implying that public data can be redistributed. The first increment is synthetic fixtures plus a thin health/data API and dashboard. The initial UI will prove the data path, not establish the final visualization library or live ingestion design.
