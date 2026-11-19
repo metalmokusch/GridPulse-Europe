@@ -37,7 +37,7 @@ Docker Compose is the intended self-hosted deployment path. On first run, copy o
 docker compose up --build -d
 ```
 
-By default, the demo binds to `127.0.0.1:8787` on the host. This is suitable when a reverse proxy runs on the same host. To expose it on the LAN, set `GRIDPULSE_BIND_ADDRESS=0.0.0.0` in a local `.env` file before starting Compose. Change the host port with `GRIDPULSE_PORT` if needed. The demo has no login, so place it behind an access-controlled reverse proxy before exposing it beyond a trusted LAN.
+By default, the demo binds to `127.0.0.1:8787` on the host. A reverse-proxy process on the host can reach it there; a reverse-proxy container needs a shared Docker network or another explicit route. To expose it on the LAN, set `GRIDPULSE_BIND_ADDRESS=0.0.0.0` in a local `.env` file before starting Compose. Change the host port with `GRIDPULSE_PORT` if needed. The demo has no login, so place it behind an access-controlled reverse proxy before exposing it beyond a trusted LAN.
 
 This fixture-only release does not write application data and has no database volume yet. Persistent storage and backup configuration will be added with the database implementation.
 
