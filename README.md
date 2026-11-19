@@ -4,7 +4,7 @@ A self-hosted dashboard for comparing European electricity generation mixes with
 
 ## Current status
 
-The first demo vertical slice is implemented. It serves synthetic HU, AT, and DE generation series through a small read-only Node.js API and presents a responsive dashboard with an hourly stacked chart, country comparison, and exact-value table. The fixture is illustrative only: it is not official, observed, or live data.
+The first demo vertical slice is implemented. It serves synthetic HU, AT, and DE generation series through a small read-only Node.js API and presents a responsive dashboard with an hourly stacked chart, country comparison, and exact-value table. The chart supports 6, 12, and 24-hour windows plus source-category filters. The fixture is illustrative only: it is not official, observed, or live data.
 
 No provider credentials, external runtime calls, or third-party npm dependencies are required.
 

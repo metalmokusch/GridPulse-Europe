@@ -331,11 +331,8 @@ main {
   font-weight: 700
 }
 
-.period-selected {
+.period-control select {
   min-width: 142px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   border: 1px solid #293737;
   background: #111b1c;
   color: #c4cfcc;
@@ -345,9 +342,9 @@ main {
   letter-spacing: 0
 }
 
-.period-selected span {
-  color: #839392;
-  font-size: 14px
+.period-control select:focus-visible,.source-chip:focus-within {
+  outline: 2px solid #82dfbd;
+  outline-offset: 2px
 }
 
 .notice {
@@ -633,6 +630,56 @@ main {
 
 .chart-panel {
   min-width: 0
+}
+
+.source-picker {
+  border: 0;
+  padding: 0;
+  margin: 14px 0 0
+}
+
+.source-picker legend {
+  color: #7e908e;
+  font-size: 9px;
+  margin-bottom: 7px
+}
+
+.category-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #2b3939;
+  border-radius: 5px;
+  color: #91a09d;
+  font-size: 9px;
+  cursor: pointer
+}
+
+.source-chip.selected {
+  border-color: #416257;
+  background: #152722;
+  color: #d3eee3
+}
+
+.source-chip input {
+  accent-color: #67c7a8;
+  width: 12px;
+  height: 12px;
+  margin: 0
+}
+
+.source-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--swatch)
 }
 
 .chart-wrap {
@@ -971,7 +1018,7 @@ footer a {
   transition: opacity .15s
 }
 
-.period-selected:focus-visible,.icon-button:focus-visible,.country-chip:focus-within,a:focus-visible,button:focus-visible {
+.icon-button:focus-visible,.country-chip:focus-within,a:focus-visible,button:focus-visible {
   outline: 2px solid #82dfbd;
   outline-offset: 2px
 }
@@ -1081,7 +1128,7 @@ footer a {
     margin-top: 2px
   }
 
-  .period-selected {
+  .period-control select {
     min-width: 112px;
     padding: 7px 8px;
     font-size: 9px
@@ -1202,7 +1249,7 @@ footer a {
     font-size: 20px
   }
 
-  .period-selected {
+  .period-control select {
     min-width: 101px
   }
 

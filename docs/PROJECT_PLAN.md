@@ -17,6 +17,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 - Standalone local Git repository connected to the public `metalmokusch/GridPulse-Europe` repository.
 - First demo vertical slice implemented with native Node.js ESM, built-in HTTP, static HTML/CSS/JavaScript, synthetic HU/AT/DE fixtures, health/data endpoints, responsive dashboard, SVG chart, comparison cards, and table alternative.
+- Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs remain based on all sources.
 - Sixteen offline Node.js tests cover health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
 - The first GitHub Actions run for commit `1c4ff7c` completed successfully on 2026-11-19.
