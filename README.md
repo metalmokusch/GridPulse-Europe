@@ -48,6 +48,7 @@ All demo observations use MW and UTC periods and are explicitly marked `syntheti
 - [ENTSO-E source gate decision](docs/adr/0002-entsoe-source-gate.md)
 - [Normalized observation contract](docs/data-model.md)
 - [Observation contract decision](docs/adr/0003-normalized-observation-contract.md)
+- [Persistence boundary decision](docs/adr/0004-persistence-boundary.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
 Live ENTSO-E ingestion remains gated on account access, confirmation of the current query contract, and reuse/attribution rights for generation data item 16.1.B&C. See the supplied project specification for the full product requirements.
