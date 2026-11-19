@@ -1,3 +1,6 @@
+import { CATEGORY_TAXONOMY, TAXONOMY_VERSION } from '../domain/categories.js';
+import { normalizeGenerationObservation, summarizeGenerationMix } from '../domain/observation.js';
+
 const CATEGORY_DEFINITIONS = [
   { id: 'wind_onshore', label: 'Onshore wind', color: '#48c6a6', renewable: true },
   { id: 'solar', label: 'Solar', color: '#f2bb63', renewable: true },
@@ -6,8 +9,6 @@ const CATEGORY_DEFINITIONS = [
   { id: 'gas', label: 'Gas', color: '#f17d77', renewable: false },
   { id: 'coal', label: 'Coal', color: '#9ca8b5', renewable: false }
 ];
-
-export const CATEGORIES = CATEGORY_DEFINITIONS;
 
 const COUNTRIES = [
   { code: 'HU', name: 'Hungary', zone: 'HU (demo zone)', phase: 0.4, base: 6900, wind: 780, solar: 1100, hydro: 90, nuclear: 1900 },
@@ -34,25 +35,46 @@ function observationAt(country, hourOffset, now) {
   const residual = Math.max(0, variation - Object.values(values).reduce((sum, value) => sum + value, 0));
   values.gas = Math.round(residual * 0.61);
   values.coal = residual - values.gas;
-  const total = Object.values(values).reduce((sum, value) => sum + value, 0);
-  const renewable = values.wind_onshore + values.solar + values.hydro;
+  const fullTaxonomyValues = Object.fromEntries(CATEGORY_TAXONOMY.map(({ id }) => [id, values[id] ?? 0]));
   const periodEnd = end.toISOString();
   const periodStart = new Date(end.getTime() - 60 * 60 * 1000).toISOString();
+  const fetchedAt = new Date(now).toISOString();
+  const normalizedObservations = CATEGORY_TAXONOMY.map(({ id }) => normalizeGenerationObservation({
+    provider: 'synthetic-demo',
+    provider_dataset: 'illustrative-generation-mix-v1',
+    source_zone: country.zone,
+    period_start_utc: periodStart,
+    period_end_utc: periodEnd,
+    source_published_at_utc: null,
+    fetched_at_utc: fetchedAt,
+    source_category: id,
+    normalized_category: id,
+    taxonomy_version: TAXONOMY_VERSION,
+    value: fullTaxonomyValues[id],
+    unit: 'MW',
+    data_status: 'synthetic',
+    quality_flags: ['synthetic_fixture', 'not_observed_data']
+  }));
+  const mix = summarizeGenerationMix(normalizedObservations, { coverage_complete: true });
 
   return {
     period_start_utc: periodStart,
     period_end_utc: periodEnd,
     source_published_at_utc: null,
-    fetched_at_utc: new Date(now).toISOString(),
+    fetched_at_utc: fetchedAt,
     provider: 'synthetic-demo',
     provider_dataset: 'illustrative-generation-mix-v1',
     source_zone: country.zone,
     unit: 'MW',
     data_status: 'synthetic',
     quality_flags: ['synthetic_fixture', 'not_observed_data'],
-    total_mw: total,
-    renewable_share_pct: total ? Number(((renewable / total) * 100).toFixed(1)) : null,
-    values: CATEGORY_DEFINITIONS.map(({ id, ...category }) => ({ category: id, ...category, value: values[id] }))
+    total_mw: mix.total_value,
+    renewable_share_pct: mix.renewable_share_pct,
+    taxonomy_version: TAXONOMY_VERSION,
+    values: CATEGORY_DEFINITIONS.map(({ id, ...category }) => {
+      const observation = normalizedObservations.find((entry) => entry.normalized_category === id);
+      return { category: id, ...category, value: observation.value };
+    })
   };
 }
 
@@ -76,8 +98,4 @@ export function getSummary(codes, { now = new Date() } = {}) {
     const series = getGenerationMix(code, { now, points: 1 });
     return series ? { ...series.country, latest: series.observations[0], source: series.source } : null;
   }).filter(Boolean);
-}
-
-export function getCategoryDefinitions() {
-  return CATEGORY_DEFINITIONS.map(({ id, label, color, renewable }) => ({ id, label, color, renewable }));
 }

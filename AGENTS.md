@@ -17,7 +17,7 @@ Build a self-hosted, read-only European electricity generation analytics applica
 ## Workflow
 
 - Read `docs/PROJECT_PLAN.md` and relevant ADRs before implementation.
-- Use `npm start` to run locally and `npm test` for the offline Node.js test suite.
+- Use `npm start` to run locally, `npm run check` for syntax checks, and `npm test` for the offline Node.js test suite.
 - Make small, reviewable changes; state assumptions and validate them.
 - Do not install dependencies, connect accounts, publish, deploy, or push without explicit authorization.
 - Update project documentation and record actual validation results after meaningful implementation work.

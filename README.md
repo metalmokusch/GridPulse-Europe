@@ -21,10 +21,13 @@ Open <http://localhost:8787/>. Set `PORT` to use another port.
 ## Validate
 
 ```sh
+npm run check
 npm test
 ```
 
-The tests exercise the health and data API contracts, synthetic mix arithmetic, input validation, read-only behavior, and static asset delivery without opening a network port.
+The tests exercise the health and data API contracts, taxonomy and observation validation, freshness classification, synthetic mix arithmetic, read-only behavior, and static asset delivery without opening a network port.
+
+The GitHub Actions workflow runs syntax checks and the offline suite on Node.js 20, 22, and 24 for pushes to `main` and pull requests.
 
 ## API
 
@@ -36,13 +39,15 @@ The tests exercise the health and data API contracts, synthetic mix arithmetic, 
 - `GET /api/v1/countries/{code}/generation-mix`
 - `GET /api/v1/countries/{code}/generation-mix/latest`
 
-All demo observations use MW and UTC periods and are explicitly marked `synthetic`. Renewable share is wind + solar + hydro divided by total generation; nuclear is excluded.
+All demo observations use MW and UTC periods and are explicitly marked `synthetic`. The versioned taxonomy is exposed at `/api/v1/categories`. Renewable share is solar, wind, hydro, biomass, and geothermal divided by total generation; nuclear is excluded. A share is omitted if coverage is incomplete or unknown source data contributes a non-zero amount.
 
 ## Project decisions and next steps
 
 - [Project plan and current status](docs/PROJECT_PLAN.md)
 - [ENTSO-E source and reuse validation](docs/data-sources.md)
 - [ENTSO-E source gate decision](docs/adr/0002-entsoe-source-gate.md)
+- [Normalized observation contract](docs/data-model.md)
+- [Observation contract decision](docs/adr/0003-normalized-observation-contract.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
 Live ENTSO-E ingestion remains gated on account access, confirmation of the current query contract, and reuse/attribution rights for generation data item 16.1.B&C. See the supplied project specification for the full product requirements.

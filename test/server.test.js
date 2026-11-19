@@ -36,6 +36,14 @@ test('countries endpoint keeps country and demo zone metadata explicit', async (
   assert.equal(result.json().countries[0].data_status, 'synthetic');
 });
 
+test('category endpoint exposes a versioned normalized taxonomy', async () => {
+  const result = await request('/api/v1/categories');
+  assert.equal(result.status, 200);
+  assert.equal(result.json().taxonomy_version, '1.0.0');
+  assert.equal(result.json().categories.find(({ id }) => id === 'unknown').renewable, false);
+  assert.equal(result.json().categories.find(({ id }) => id === 'wind_offshore').renewable, true);
+});
+
 test('generation mix provides 24 UTC periods with explicit units and synthetic status', async () => {
   const result = await request('/api/v1/countries/HU/generation-mix');
   assert.equal(result.status, 200);

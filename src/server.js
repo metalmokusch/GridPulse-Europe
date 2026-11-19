@@ -2,7 +2,8 @@ import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CATEGORIES, getCountries, getGenerationMix, getSummary } from './data/demo-data.js';
+import { getCountries, getGenerationMix, getSummary } from './data/demo-data.js';
+import { getCategoryTaxonomy, TAXONOMY_VERSION } from './domain/categories.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
@@ -35,7 +36,7 @@ export function handleRequest(request, response) {
     if (url.pathname === '/health/live') return json(response, 200, { status: 'ok' });
     if (url.pathname === '/health/ready') return json(response, 200, { status: 'ready', persistence: 'fixture', provider: 'synthetic-demo' });
     if (url.pathname === '/api/v1/countries') return json(response, 200, { countries: getCountries() });
-    if (url.pathname === '/api/v1/categories') return json(response, 200, { categories: CATEGORIES.map(({ id, ...category }) => ({ id, ...category })) });
+    if (url.pathname === '/api/v1/categories') return json(response, 200, { taxonomy_version: TAXONOMY_VERSION, categories: getCategoryTaxonomy() });
 
     if (url.pathname === '/api/v1/dashboard/summary') {
       const requested = (url.searchParams.get('countries') ?? 'HU').split(',').map((code) => code.trim().toUpperCase()).filter(Boolean);

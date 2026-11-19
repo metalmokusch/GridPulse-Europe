@@ -6,7 +6,8 @@
   "description": "Self-hosted European electricity generation analytics demo",
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "check": "node --check src/server.js && node --check src/data/demo-data.js && node --check src/domain/categories.js && node --check src/domain/observation.js && node --check src/domain/freshness.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"
