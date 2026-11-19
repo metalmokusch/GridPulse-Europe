@@ -20,8 +20,8 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs remain based on all sources.
 - Dashboard country, period, and source selections are encoded in the URL so selected views can be shared and restored.
 - Sixteen offline Node.js tests cover health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, input validation, and static asset delivery.
-- No third-party runtime dependencies or provider credentials. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
-- GitHub Actions run #7 for commit `6e39142` completed successfully on 2026-11-19 (Node.js 20/22/24 matrix and container image build).
+- No third-party runtime dependencies or provider credentials are required. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
+- GitHub Actions has successfully checked the dashboard and container build, using a Node.js 20/22/24 test matrix.
 - Dockerfile and Compose configuration now package the fixture-only demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. GitHub Actions builds the container image. No data volume is configured before persistence exists.
 - Current official ENTSO-E data-source documentation and reuse terms are recorded in [data-sources.md](data-sources.md). Provider integration and live data queries remain gated on authorized access and reuse rights. Candidate query parameters need confirmation against current documentation.
 
