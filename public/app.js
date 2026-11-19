@@ -99,7 +99,8 @@ function renderChart(series) {
     .reduce((sum, item) => sum + item.value, 0))) * 1.15;
   const step = plotWidth / observations.length; const barWidth = Math.max(4, step * 0.62);
   const grid = [0, 0.25, 0.5, 0.75, 1];
-  let svg = `<svg class="mix-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="mix-chart-title mix-chart-desc"><title id="mix-chart-title">Synthetic electricity generation profile for ${escapeHtml(primary.country.name)}</title><desc id="mix-chart-desc">Stacked hourly column chart in megawatts. The table below provides the exact latest values.</desc>`;
+  const visibleSourceNames = categories.map(({ label }) => label).join(', ');
+  let svg = `<svg class="mix-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="mix-chart-title" aria-describedby="mix-chart-desc"><title id="mix-chart-title">Synthetic electricity generation profile for ${escapeHtml(primary.country.name)}</title><desc id="mix-chart-desc">Stacked hourly megawatt chart for the last ${state.periodHours} hours, showing ${escapeHtml(visibleSourceNames)}. The table below provides exact latest values for all selected countries.</desc>`;
   grid.forEach((fraction) => {
     const y = top + plotHeight * (1 - fraction);
     svg += `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="grid-line"/><text x="${left - 9}" y="${y + 4}" text-anchor="end" class="axis-label">${fmtNumber(max * fraction / 1000)}k</text>`;

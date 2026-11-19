@@ -1131,7 +1131,8 @@ footer a {
   .period-control select {
     min-width: 112px;
     padding: 7px 8px;
-    font-size: 9px
+    min-height: 42px;
+    font-size: 10px
   }
 
   .notice {
@@ -1204,6 +1205,17 @@ footer a {
     min-height: 180px
   }
 
+  .source-chip {
+    min-height: 42px;
+    padding: 7px 10px;
+    font-size: 10px
+  }
+
+  .source-chip input {
+    width: 16px;
+    height: 16px
+  }
+
   .legend {
     margin-left: 5px;
     gap: 10px
@@ -1250,7 +1262,9 @@ footer a {
   }
 
   .period-control select {
-    min-width: 101px
+    min-width: 101px;
+    padding-left: 7px;
+    padding-right: 7px
   }
 
   .country-chip {
