@@ -41,6 +41,8 @@ All demo observations use MW and UTC periods and are explicitly marked `syntheti
 ## Project decisions and next steps
 
 - [Project plan and current status](docs/PROJECT_PLAN.md)
+- [ENTSO-E source and reuse validation](docs/data-sources.md)
+- [ENTSO-E source gate decision](docs/adr/0002-entsoe-source-gate.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
-Live ENTSO-E ingestion remains gated on validating token access, zone coverage, API behavior, and reuse/attribution terms. See the supplied project specification for the full product requirements.
+Live ENTSO-E ingestion remains gated on account access, confirmation of the current query contract, and reuse/attribution rights for generation data item 16.1.B&C. See the supplied project specification for the full product requirements.
