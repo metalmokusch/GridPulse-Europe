@@ -74,6 +74,8 @@ test('read-only API, static dashboard assets, and unknown routes behave predicta
   assert.equal(page.status, 200);
   assert.match(page.headers['content-type'], /text\/html/);
   assert.match(page.text, /Illustrative demo data/);
+  assert.match(page.text, /href="#mix"[^>]*>.*Generation mix/);
+  assert.doesNotMatch(page.text, /SOON/);
   const script = await request('/app.js');
   assert.match(script.headers['content-type'], /javascript/);
   const missing = await request('/api/v1/no-such-route');

@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 /run/secrets/
+/secrets/
 
 # Dependencies and build outputs
 node_modules/

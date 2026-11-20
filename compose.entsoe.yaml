@@ -1,0 +1,11 @@
+services:
+  app:
+    environment:
+      GRIDPULSE_DATA_SOURCE: entsoe
+      ENTSOE_API_TOKEN_FILE: /run/secrets/entsoe_api_token
+    secrets:
+      - entsoe_api_token
+
+secrets:
+  entsoe_api_token:
+    file: ${ENTSOE_API_TOKEN_FILE:-./secrets/entsoe_api_token}

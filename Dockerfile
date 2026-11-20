@@ -1,7 +1,8 @@
 FROM node:24-alpine
 
 ENV NODE_ENV=production \
-    PORT=8787
+    PORT=8787 \
+    GRIDPULSE_BIND_ADDRESS=0.0.0.0
 
 WORKDIR /app
 

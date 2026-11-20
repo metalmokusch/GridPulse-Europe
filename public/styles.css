@@ -1298,3 +1298,4 @@ footer a {
     transition: none!important
   }
 }
+.notice[hidden] { display: none; }

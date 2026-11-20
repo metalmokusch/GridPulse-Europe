@@ -6,7 +6,35 @@ A self-hosted dashboard for comparing European electricity generation mixes with
 
 The first demo vertical slice is implemented. It serves synthetic HU, AT, and DE generation series through a small read-only Node.js API and presents a responsive dashboard with an hourly stacked chart, country comparison, and exact-value table. The chart supports 6, 12, and 24-hour windows plus source-category filters; country, period, and source selections are encoded in the URL so a view can be shared. The fixture is illustrative only: it is not official, observed, or live data.
 
-No provider credentials, external runtime calls, or third-party npm dependencies are required.
+The default demo needs no provider credentials or external runtime calls. No third-party npm dependencies are used.
+
+The owner has received ENTSO-E API access. An optional, manual validation request is available for confirming the candidate query contract. It is separate from the app runtime and does not persist or print response values:
+
+```sh
+ENTSOE_API_TOKEN='your-local-token' npm run entsoe:validate
+```
+
+Prefer loading the variable from an untracked local `.env` or the shell. Do not paste the token into chat or commit it. Public display of ENTSO-E data remains disabled while item 16.1.B&C reuse rights are unresolved.
+
+For a local secret file, place the token in `secrets/entsoe_api_token` and restrict access (`chmod 600 secrets/entsoe_api_token`). Then run `ENTSOE_API_TOKEN_FILE=secrets/entsoe_api_token npm run entsoe:validate`. The demo Compose service does not receive the token, because the current app does not use live data.
+
+## Private live HU mode
+
+The server can fetch live ENTSO-E HU data on demand when explicitly enabled. Local Node.js:
+
+```sh
+GRIDPULSE_DATA_SOURCE=entsoe ENTSOE_API_TOKEN_FILE=secrets/entsoe_api_token npm start
+```
+
+Docker Compose uses a separate overlay, which mounts the token as a file-backed secret and leaves the default demo service unchanged. The secret file must be readable by the container's `node` user (UID 1000); on a Linux host, set its owner to that UID and use mode `400` where appropriate:
+
+```sh
+sudo chown 1000:1000 secrets/entsoe_api_token
+sudo chmod 400 secrets/entsoe_api_token
+docker compose -f compose.yaml -f compose.entsoe.yaml up --build -d
+```
+
+The app currently supports only the validated HU zone in live mode. Responses are cached in memory for five minutes; manual refresh bypasses that cache and live mode refreshes automatically every 15 minutes. No provider values are persisted. Freshness is classified from the latest market period end using provisional 90-minute/3-hour thresholds. Unconfirmed/missing categories remain visible as gaps and renewable share is withheld. The existing server has no login, so keep the default host binding at `127.0.0.1` and do not expose live mode to a network you do not control. Live mode stays opt-in and is not part of the public demo.
 
 ## Run locally
 
@@ -61,6 +89,7 @@ All demo observations use MW and UTC periods and are explicitly marked `syntheti
 - [Normalized observation contract](docs/data-model.md)
 - [Observation contract decision](docs/adr/0003-normalized-observation-contract.md)
 - [Persistence boundary decision](docs/adr/0004-persistence-boundary.md)
+- [Live data freshness thresholds](docs/adr/0005-live-data-freshness-thresholds.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
-Live ENTSO-E ingestion remains gated on account access, confirmation of the current query contract, and reuse/attribution rights for generation data item 16.1.B&C. See the supplied project specification for the full product requirements.
+An isolated ENTSO-E parser and normalizer support an opt-in, private HU live mode. The dashboard remains synthetic by default. Public redistribution is not enabled; ENTSO-E attribution and primary-owner rights requirements still apply. See the project plan and source notes for current details.

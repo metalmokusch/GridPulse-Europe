@@ -1,8 +1,12 @@
+import { parseDashboardState, serializeDashboardState } from './dashboard-state.js';
+
 const COLORS = {
   wind_onshore: '#48c6a6', solar: '#f2bb63', hydro: '#68a8ef',
-  nuclear: '#a991ed', gas: '#f17d77', coal: '#9ca8b5'
+  wind_offshore: '#37a78b', biomass: '#5aa46c', geothermal: '#bb8056',
+  nuclear: '#a991ed', gas: '#f17d77', coal: '#9ca8b5', oil: '#796b62',
+  other_fossil: '#b77c69', other: '#788697', unknown: '#657386'
 };
-const state = { countries: [], selected: ['HU'], selectedCategories: Object.keys(COLORS), periodHours: 24, timer: null };
+const state = { countries: [], selected: ['HU'], selectedCategories: Object.keys(COLORS), periodHours: 24, timer: null, refreshInterval: null };
 const $ = (selector) => document.querySelector(selector);
 
 async function request(path) {
@@ -28,37 +32,23 @@ function renderPicker() {
 }
 
 function restoreDashboardState() {
-  const params = new URLSearchParams(window.location.search);
-  const requestedCountries = (params.get('countries') ?? '').split(',').map((code) => code.trim().toUpperCase()).filter(Boolean);
-  if (requestedCountries.length && requestedCountries.length <= 3
-    && new Set(requestedCountries).size === requestedCountries.length
-    && requestedCountries.every((code) => state.countries.some((country) => country.code === code))) {
-    state.selected = requestedCountries;
-  }
-
-  const requestedHours = Number(params.get('hours'));
-  if ([6, 12, 24].includes(requestedHours)) state.periodHours = requestedHours;
+  const parsed = parseDashboardState(window.location.search, {
+    countryCodes: state.countries.map(({ code }) => code),
+    sourceIds: Object.keys(COLORS)
+  });
+  state.selected = parsed.countries;
+  state.periodHours = parsed.hours;
+  state.selectedCategories = parsed.sources;
   $('#period-select').value = String(state.periodHours);
-
-  if (params.has('sources')) {
-    const requestedSources = params.get('sources').split(',').filter(Boolean);
-    if (requestedSources.length && new Set(requestedSources).size === requestedSources.length
-      && requestedSources.every((category) => Object.hasOwn(COLORS, category))) {
-      state.selectedCategories = requestedSources;
-    }
-  }
 }
 
 function syncDashboardUrl() {
-  const url = new URL(window.location.href);
-  if (state.selected.length === 1 && state.selected[0] === 'HU') url.searchParams.delete('countries');
-  else url.searchParams.set('countries', state.selected.join(','));
-  if (state.periodHours === 24) url.searchParams.delete('hours');
-  else url.searchParams.set('hours', String(state.periodHours));
-  const allSources = Object.keys(COLORS);
-  if (allSources.every((category) => state.selectedCategories.includes(category))) url.searchParams.delete('sources');
-  else url.searchParams.set('sources', allSources.filter((category) => state.selectedCategories.includes(category)).join(','));
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  const path = serializeDashboardState({
+    countries: state.selected,
+    hours: state.periodHours,
+    sources: state.selectedCategories
+  }, window.location.href, { allSources: Object.keys(COLORS) });
+  window.history.replaceState(null, '', path);
 }
 
 function onCountryChange(event) {
@@ -84,7 +74,7 @@ function renderCategoryPicker() {
   if (!state.selectedCategoriesCatalog) return;
   $('#category-picker').innerHTML = state.selectedCategoriesCatalog.map((category) => {
     const checked = state.selectedCategories.includes(category.id);
-    return `<label class="source-chip ${checked ? 'selected' : ''}"><input type="checkbox" value="${category.id}" ${checked ? 'checked' : ''}><i style="--swatch:${COLORS[category.id]}"></i><span>${escapeHtml(category.label)}</span></label>`;
+    return `<label class="source-chip ${checked ? 'selected' : ''}"><input type="checkbox" value="${category.id}" ${checked ? 'checked' : ''}><i style="--swatch:${COLORS[category.id] ?? COLORS.unknown}"></i><span>${escapeHtml(category.label)}</span></label>`;
   }).join('');
   $('#category-picker').querySelectorAll('input').forEach((input) => input.addEventListener('change', onCategoryChange));
 }
@@ -113,20 +103,26 @@ function showToast(message) {
 
 function renderKpis(summary) {
   const total = summary.reduce((sum, item) => sum + item.latest.total_mw, 0);
-  const weightedRenewables = total ? summary.reduce((sum, item) => sum + item.latest.total_mw * item.latest.renewable_share_pct / 100, 0) / total * 100 : 0;
+  const coverageComplete = summary.every((item) => item.latest.coverage_complete !== false && item.latest.renewable_share_pct !== null);
+  const weightedRenewables = coverageComplete && total ? summary.reduce((sum, item) => sum + item.latest.total_mw * item.latest.renewable_share_pct / 100, 0) / total * 100 : null;
   const latest = summary.reduce((value, item) => item.latest.period_end_utc > value ? item.latest.period_end_utc : value, summary[0].latest.period_end_utc);
   const leading = [...summary].sort((a, b) => b.latest.renewable_share_pct - a.latest.renewable_share_pct)[0];
   $('#kpis').innerHTML = `
-    <article class="kpi-card"><div class="kpi-top"><span>COMBINED GENERATION</span><span class="kpi-icon mint" aria-hidden="true">↗</span></div><strong>${fmtNumber(total)} <small>MW</small></strong><div class="kpi-detail">Across ${summary.length} selected ${summary.length === 1 ? 'demo zone' : 'demo zones'}</div></article>
-    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE SHARE</span><span class="kpi-icon blue" aria-hidden="true">◌</span></div><strong>${weightedRenewables.toFixed(1)}<small>%</small></strong><div class="kpi-detail">All sources · weighted by generation <span class="info" title="Solar, wind, hydro, biomass, and geothermal divided by total generation. Nuclear is excluded.">i</span></div></article>
-    <article class="kpi-card"><div class="kpi-top"><span>HIGHEST RENEWABLE MIX</span><span class="kpi-icon gold" aria-hidden="true">✳</span></div><strong>${leading.latest.renewable_share_pct.toFixed(1)}<small>%</small></strong><div class="kpi-detail">${escapeHtml(leading.name)} <span class="kpi-inline-code">${leading.code}</span></div></article>
+    <article class="kpi-card"><div class="kpi-top"><span>${coverageComplete ? 'COMBINED GENERATION' : 'OBSERVED GENERATION'}</span><span class="kpi-icon mint" aria-hidden="true">↗</span></div><strong>${fmtNumber(total)} <small>MW</small></strong><div class="kpi-detail">${coverageComplete ? 'Complete category coverage' : 'Reported categories only · coverage incomplete'}</div></article>
+    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE SHARE</span><span class="kpi-icon blue" aria-hidden="true">◌</span></div><strong>${weightedRenewables === null ? '—' : `${weightedRenewables.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? 'All sources · weighted by generation' : 'Unavailable until category coverage is confirmed'}</div></article>
+    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE MIX</span><span class="kpi-icon gold" aria-hidden="true">✳</span></div><strong>${leading.latest.renewable_share_pct === null ? '—' : `${leading.latest.renewable_share_pct.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? `${escapeHtml(leading.name)} (${leading.code})` : 'Unavailable · incomplete coverage'}</div></article>
     <article class="kpi-card"><div class="kpi-top"><span>DATA PERIOD ENDS</span><span class="kpi-icon violet" aria-hidden="true">◷</span></div><strong class="time-value">${fmtTime(latest)}</strong><div class="kpi-detail">${fmtDate(latest)} · UTC</div></article>`;
 }
 
 function renderChart(series) {
   const primary = series[0];
-  const observations = primary.observations.slice(-state.periodHours);
-  const categories = observations.at(-1).values.filter(({ category }) => state.selectedCategories.includes(category));
+  const latestObservation = primary.observations.at(-1);
+  const intervalMs = Date.parse(latestObservation.period_end_utc) - Date.parse(latestObservation.period_start_utc);
+  const pointCount = Math.max(1, Math.round(state.periodHours * 3_600_000 / intervalMs));
+  const observations = primary.observations.slice(-pointCount);
+  const categories = [...new Map(observations.flatMap(({ values }) => values)
+    .filter(({ category }) => state.selectedCategories.includes(category))
+    .map((item) => [`${item.category}:${item.label}`, item])).values()];
   const width = 760; const height = 252; const left = 56; const right = 16; const top = 14; const bottom = 34;
   const plotWidth = width - left - right; const plotHeight = height - top - bottom;
   const max = Math.max(1, ...observations.map((observation) => observation.values
@@ -135,7 +131,7 @@ function renderChart(series) {
   const step = plotWidth / observations.length; const barWidth = Math.max(4, step * 0.62);
   const grid = [0, 0.25, 0.5, 0.75, 1];
   const visibleSourceNames = categories.map(({ label }) => label).join(', ');
-  let svg = `<svg class="mix-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="mix-chart-title" aria-describedby="mix-chart-desc"><title id="mix-chart-title">Synthetic electricity generation profile for ${escapeHtml(primary.country.name)}</title><desc id="mix-chart-desc">Stacked hourly megawatt chart for the last ${state.periodHours} hours, showing ${escapeHtml(visibleSourceNames)}. The table below provides exact latest values for all selected countries.</desc>`;
+  let svg = `<svg class="mix-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="mix-chart-title" aria-describedby="mix-chart-desc"><title id="mix-chart-title">Electricity generation profile for ${escapeHtml(primary.country.name)}</title><desc id="mix-chart-desc">Stacked ${Math.round(intervalMs / 60_000)}-minute megawatt observations for the last ${state.periodHours} hours, showing ${escapeHtml(visibleSourceNames)}.</desc>`;
   grid.forEach((fraction) => {
     const y = top + plotHeight * (1 - fraction);
     svg += `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="grid-line"/><text x="${left - 9}" y="${y + 4}" text-anchor="end" class="axis-label">${fmtNumber(max * fraction / 1000)}k</text>`;
@@ -147,7 +143,7 @@ function renderChart(series) {
       const x = left + index * step + (step - barWidth) / 2;
       const y = top + plotHeight - (stacked + item.value) / max * plotHeight;
       const opacity = item.value > 0 ? 0.9 : 0;
-      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.max(0, barHeight).toFixed(1)}" rx="2" fill="${COLORS[item.category]}" opacity="${opacity}"><title>${fmtTime(observation.period_end_utc)} · ${escapeHtml(item.label)}: ${fmtNumber(item.value)} MW</title></rect>`;
+      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.max(0, barHeight).toFixed(1)}" rx="2" fill="${COLORS[item.category] ?? COLORS.unknown}" opacity="${opacity}"><title>${fmtTime(observation.period_end_utc)} · ${escapeHtml(item.label)}: ${fmtNumber(item.value)} MW</title></rect>`;
       stacked += item.value;
     });
     if (index % 4 === 0 || index === observations.length - 1) {
@@ -158,28 +154,44 @@ function renderChart(series) {
   svg += '</svg>';
   $('#chart-wrap').innerHTML = svg;
   $('#chart-caption').textContent = `${primary.country.name} · last ${state.periodHours} hours · selected sources · MW`;
-  $('#legend').innerHTML = categories.map((category) => `<span><i style="--swatch:${COLORS[category.category]}"></i>${escapeHtml(category.label)}</span>`).join('');
+  $('#legend').innerHTML = categories.map((category) => `<span><i style="--swatch:${COLORS[category.category] ?? COLORS.unknown}"></i>${escapeHtml(category.label)}</span>`).join('');
 }
 
 function renderComparison(summary) {
-  const max = Math.max(...summary.map((item) => item.latest.total_mw));
+  const max = Math.max(1, ...summary.map((item) => item.latest.total_mw));
   $('#comparison-list').innerHTML = summary.map((item) => {
     const share = item.latest.renewable_share_pct;
-    return `<article class="comparison-item"><div class="comparison-top"><div class="comparison-country"><span class="flag flag-${item.code.toLowerCase()}" aria-hidden="true"></span><strong>${escapeHtml(item.name)}</strong><span class="chip-code">${item.code}</span></div><span class="comparison-time">${fmtTime(item.latest.period_end_utc)}</span></div><div class="comparison-metrics"><strong>${fmtNumber(item.latest.total_mw)} <small>MW</small></strong><span>${share.toFixed(1)}% renewable</span></div><div class="progress-track" role="img" aria-label="${share.toFixed(1)} percent renewable"><span style="width:${Math.max(0, Math.min(100, share))}%"></span></div><div class="comparison-foot"><span>Generation</span><span>${(item.latest.total_mw / max * 100).toFixed(0)}% of selected peak</span></div></article>`;
+    const shareLabel = share === null ? 'Renewable share unavailable' : `${share.toFixed(1)}% renewable`;
+    const progressWidth = share === null ? 0 : Math.max(0, Math.min(100, share));
+    return `<article class="comparison-item"><div class="comparison-top"><div class="comparison-country"><span class="flag flag-${item.code.toLowerCase()}" aria-hidden="true"></span><strong>${escapeHtml(item.name)}</strong><span class="chip-code">${item.code}</span></div><span class="comparison-time">${fmtTime(item.latest.period_end_utc)}</span></div><div class="comparison-metrics"><strong>${fmtNumber(item.latest.total_mw)} <small>MW</small></strong><span>${shareLabel}</span></div><div class="progress-track" role="img" aria-label="${shareLabel}"><span style="width:${progressWidth}%"></span></div><div class="comparison-foot"><span>${item.latest.coverage_complete === false ? 'Reported categories' : 'Generation'}</span><span>${(item.latest.total_mw / max * 100).toFixed(0)}% of selected peak</span></div></article>`;
   }).join('');
 }
 
 function renderTable(summary) {
-  const categories = summary[0].latest.values.filter(({ category }) => state.selectedCategories.includes(category));
+  const categories = [...new Map(state.latestSeries[0].observations.flatMap(({ values }) => values)
+    .filter(({ category }) => state.selectedCategories.includes(category))
+    .map((item) => [`${item.category}:${item.label}`, item])).values()];
   $('#table-head').innerHTML = `<tr><th scope="col">SOURCE</th>${summary.map((item) => `<th scope="col">${escapeHtml(item.name)} <span>${item.code}</span></th>`).join('')}</tr>`;
-  const rows = categories.map((category) => `<tr><th scope="row"><span class="source-name"><i style="--swatch:${COLORS[category.category]}"></i>${escapeHtml(category.label)}</span></th>${summary.map((item) => {
-    const value = item.latest.values.find((entry) => entry.category === category.category)?.value ?? 0;
-    return `<td>${fmtNumber(value)} <span>MW</span></td>`;
+  const rows = categories.map((category) => `<tr><th scope="row"><span class="source-name"><i style="--swatch:${COLORS[category.category] ?? COLORS.unknown}"></i>${escapeHtml(category.label)}</span></th>${summary.map((item) => {
+    const value = item.latest.values.find((entry) => entry.category === category.category && entry.label === category.label)?.value;
+    return `<td>${value === undefined ? '—' : `${fmtNumber(value)} <span>MW</span>`}</td>`;
   }).join('')}</tr>`).join('');
-  const selectedTotals = summary.map((item) => categories.reduce((sum, category) => sum + (item.latest.values.find((entry) => entry.category === category.category)?.value ?? 0), 0));
-  $('#table-body').innerHTML = rows + `<tr class="total-row"><th scope="row">Selected sources total</th>${selectedTotals.map((value) => `<td>${fmtNumber(value)} <span>MW</span></td>`).join('')}</tr>`;
+  const selectedTotals = summary.map((item) => categories.reduce((sum, category) => sum + (item.latest.values.find((entry) => entry.category === category.category && entry.label === category.label)?.value ?? 0), 0));
+  $('#table-body').innerHTML = rows + `<tr class="total-row"><th scope="row">${summary[0].latest.coverage_complete === false ? 'Selected reported total' : 'Selected sources total'}</th>${selectedTotals.map((value) => `<td>${fmtNumber(value)} <span>MW</span></td>`).join('')}</tr>`;
   $('#table-caption').textContent = `Selected sources · latest sample period · ${fmtDate(summary[0].latest.period_end_utc)}`;
-  $('#source-meta').textContent = `Source: synthetic demo fixture · sample period ${fmtDate(summary[0].latest.period_start_utc)} – ${fmtDate(summary[0].latest.period_end_utc)}`;
+  $('#source-meta').textContent = `Source: ${summary[0].source.label} · sample ${fmtDate(summary[0].latest.period_start_utc)}–${fmtDate(summary[0].latest.period_end_utc)} · fetched ${fmtDate(summary[0].latest.fetched_at_utc)}`;
+  const source = summary[0].source;
+  const live = summary[0].source.provider === 'entsoe';
+  $('#table-status').textContent = live ? 'MW · ENTSO-E' : 'MW · SYNTHETIC';
+  $('#table-footer-status').textContent = live ? 'Reported values · coverage incomplete' : 'Demo fixture · not for analytical use';
+  $('#demo-notice').hidden = live;
+  $('#live-notice').hidden = !live;
+  const freshnessLabels = { fresh: 'Fresh', delayed: 'Delayed', stale: 'Stale', no_data: 'No data', unknown: 'Unknown age' };
+  const freshnessLabel = freshnessLabels[source.freshness?.status] ?? 'Unknown age';
+  $('#demo-pill').innerHTML = live ? `<span></span>ENTSO-E · ${freshnessLabel.toUpperCase()}` : '<span></span>DEMO DATA';
+  $('#system-title').textContent = live ? `ENTSO-E · ${freshnessLabel}` : 'Demo environment';
+  $('#system-subtitle').textContent = live ? 'HU · latest period age' : 'No provider connected';
+  $('#chart-footnote').textContent = live ? 'Reported observations · gaps remain blank' : 'Synthetic hourly samples';
 }
 
 function renderError(message) {
@@ -190,18 +202,23 @@ function renderError(message) {
   $('#retry').addEventListener('click', loadDashboard);
 }
 
-async function loadDashboard() {
+async function loadDashboard({ force = false } = {}) {
   $('#dashboard-content').setAttribute('aria-busy', 'true');
   try {
     const countries = encodeURIComponent(state.selected.join(','));
+    const refreshParam = force ? '&refresh=true' : '';
     const [summaryResult, ...series] = await Promise.all([
-      request(`/api/v1/dashboard/summary?countries=${countries}`),
-      ...state.selected.map((code) => request(`/api/v1/countries/${code}/generation-mix`))
+      request(`/api/v1/dashboard/summary?countries=${countries}${refreshParam}`),
+      ...state.selected.map((code) => request(`/api/v1/countries/${code}/generation-mix${force ? '?refresh=true' : ''}`))
     ]);
     state.latestSummary = summaryResult.summary;
     state.latestSeries = series;
-    state.selectedCategoriesCatalog = series[0].observations.at(-1).values.map(({ category, label }) => ({ id: category, label }));
+    state.selectedCategoriesCatalog = [...new Map(series.flatMap(({ observations }) => observations.flatMap(({ values }) => values))
+      .map(({ category, label }) => [category, { id: category, label: category === 'unknown' ? 'Unclassified sources' : label }])).values()];
     renderCurrentDashboard();
+    if (summaryResult.summary[0]?.source.provider === 'entsoe' && !state.refreshInterval) {
+      state.refreshInterval = setInterval(() => loadDashboard({ force: true }), 15 * 60_000);
+    }
   } catch (error) {
     renderError(error.message);
   }
@@ -232,7 +249,7 @@ async function init() {
   }
 }
 
-$('#refresh').addEventListener('click', () => { loadDashboard(); showToast('Demo sample refreshed.'); });
+$('#refresh').addEventListener('click', () => { loadDashboard({ force: true }); showToast('Requesting updated data.'); });
 $('#period-select').addEventListener('change', (event) => {
   state.periodHours = Number(event.target.value);
   renderCurrentDashboard();
