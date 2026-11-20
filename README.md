@@ -34,6 +34,8 @@ sudo chmod 400 secrets/entsoe_api_token
 docker compose -f compose.yaml -f compose.entsoe.yaml up --build -d
 ```
 
+The ENTSO-E Compose overlay also stores a local quality log at `${GRIDPULSE_DATA_DIR:-./gridpulse-data}/quality.jsonl`. It runs a separate hourly check by default (`GRIDPULSE_QUALITY_INTERVAL_MINUTES`, minimum 30 minutes), independent of dashboard visits, and records request outcome, latest-period age, observed/missing interval counts, and source category IDs. It never writes production quantities, response text, or the API token. The log is excluded from Git. The dashboard's “Local quality history” panel summarizes the most recent 24 hours. Summaries read at most the last 2,880 records (30 days at the default cadence).
+
 The app currently supports only the validated HU zone in live mode. Responses are cached in memory for five minutes; manual refresh bypasses that cache and live mode refreshes automatically every 15 minutes. No provider values are persisted. Freshness is classified from the latest market period end using provisional 90-minute/3-hour thresholds. Unconfirmed/missing categories remain visible as gaps and renewable share is withheld. The existing server has no login, so keep the default host binding at `127.0.0.1` and do not expose live mode to a network you do not control. Live mode stays opt-in and is not part of the public demo.
 
 ## Run locally
@@ -90,6 +92,7 @@ All demo observations use MW and UTC periods and are explicitly marked `syntheti
 - [Observation contract decision](docs/adr/0003-normalized-observation-contract.md)
 - [Persistence boundary decision](docs/adr/0004-persistence-boundary.md)
 - [Live data freshness thresholds](docs/adr/0005-live-data-freshness-thresholds.md)
+- [Private live quality monitoring](docs/adr/0006-private-quality-monitoring.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
 An isolated ENTSO-E parser and normalizer support an opt-in, private HU live mode. The dashboard remains synthetic by default. Public redistribution is not enabled; ENTSO-E attribution and primary-owner rights requirements still apply. See the project plan and source notes for current details.

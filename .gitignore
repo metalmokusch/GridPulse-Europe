@@ -4,6 +4,7 @@
 !.env.example
 /run/secrets/
 /secrets/
+/gridpulse-data/
 
 # Dependencies and build outputs
 node_modules/

@@ -224,6 +224,33 @@ async function loadDashboard({ force = false } = {}) {
   }
 }
 
+function renderQualityMonitor(monitoring) {
+  const panel = $('#quality-monitor');
+  panel.hidden = false;
+  const latest = monitoring.latest_success;
+  $('#quality-summary').textContent = monitoring.checks
+    ? `${monitoring.successes}/${monitoring.checks} refresh checks succeeded · ${monitoring.success_rate_pct}% success`
+    : 'No refresh checks recorded yet.';
+  $('#quality-updated').textContent = latest ? `Last check ${fmtDate(latest.checked_at_utc)}` : '';
+  $('#quality-stats').innerHTML = latest ? `
+    <article><strong>${latest.freshness_minutes ?? '—'} min</strong><span>Latest period age</span></article>
+    <article><strong>${latest.intervals_observed}/${latest.intervals_expected}</strong><span>Reported intervals · last fetch</span></article>
+    <article><strong>${monitoring.mean_observed_interval_pct ?? '—'}%</strong><span>Mean interval coverage</span></article>
+    <article><strong>${escapeHtml(latest.source_categories.join(', ') || '—')}</strong><span>Source category codes</span></article>` : '';
+  $('#quality-sparse').textContent = latest?.sparse_category_ids?.length
+    ? `Sparse categories in last fetch: ${latest.sparse_category_ids.join(', ')}`
+    : latest ? 'No sparse category series detected in the last fetch.' : '';
+}
+
+async function loadQualityMonitor() {
+  try {
+    const result = await request('/api/v1/monitoring/quality');
+    renderQualityMonitor(result.monitoring);
+  } catch {
+    $('#quality-monitor').hidden = true;
+  }
+}
+
 function renderCurrentDashboard() {
   if (!state.latestSummary || !state.latestSeries) return;
   renderKpis(state.latestSummary);
@@ -244,6 +271,8 @@ async function init() {
     restoreDashboardState();
     renderPicker();
     await loadDashboard();
+    await loadQualityMonitor();
+    if (!state.monitoringInterval) state.monitoringInterval = setInterval(loadQualityMonitor, 5 * 60_000);
   } catch (error) {
     renderError(error.message);
   }

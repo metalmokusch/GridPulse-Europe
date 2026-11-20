@@ -2,7 +2,11 @@ services:
   app:
     environment:
       GRIDPULSE_DATA_SOURCE: entsoe
+      GRIDPULSE_QUALITY_LOG_FILE: /var/lib/gridpulse/quality.jsonl
+      GRIDPULSE_QUALITY_INTERVAL_MINUTES: ${GRIDPULSE_QUALITY_INTERVAL_MINUTES:-60}
       ENTSOE_API_TOKEN_FILE: /run/secrets/entsoe_api_token
+    volumes:
+      - ${GRIDPULSE_DATA_DIR:-./gridpulse-data}:/var/lib/gridpulse
     secrets:
       - entsoe_api_token
 

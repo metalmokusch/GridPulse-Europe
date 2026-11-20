@@ -8,7 +8,7 @@
     "start": "node src/server.js",
     "test": "node --test",
     "entsoe:validate": "node src/providers/entsoe/validate-access.js",
-    "check": "node --check src/server.js && node --check src/data/demo-data.js && node --check src/domain/categories.js && node --check src/domain/observation.js && node --check src/domain/freshness.js && node --check src/providers/entsoe/client.js && node --check src/providers/entsoe/parse-response.js && node --check src/providers/entsoe/normalize-generation.js && node --check src/providers/entsoe/psr-types.js && node --check src/providers/entsoe/validate-access.js && node --check public/dashboard-state.js && node --check public/app.js"
+    "check": "node --check src/server.js && node --check src/data/demo-data.js && node --check src/domain/categories.js && node --check src/domain/observation.js && node --check src/domain/freshness.js && node --check src/monitoring/quality-monitor.js && node --check src/providers/entsoe/client.js && node --check src/providers/entsoe/parse-response.js && node --check src/providers/entsoe/normalize-generation.js && node --check src/providers/entsoe/psr-types.js && node --check src/providers/entsoe/validate-access.js && node --check public/dashboard-state.js && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"

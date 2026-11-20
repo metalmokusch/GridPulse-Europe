@@ -6,6 +6,7 @@ import { getCountries, getGenerationMix, getSummary } from './data/demo-data.js'
 import { getCategoryTaxonomy, TAXONOMY_VERSION } from './domain/categories.js';
 import { classifyFreshness } from './domain/freshness.js';
 import { fetchEntsoeGeneration } from './providers/entsoe/client.js';
+import { createQualityMonitor } from './monitoring/quality-monitor.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
@@ -15,6 +16,11 @@ const COUNTRY_CODES = new Set((LIVE_MODE ? ['HU'] : getCountries().map(({ code }
 let liveCache;
 let liveCacheExpiresAt = 0;
 let liveFetch;
+const qualityMonitor = LIVE_MODE && process.env.GRIDPULSE_QUALITY_LOG_FILE
+  ? createQualityMonitor({ filePath: process.env.GRIDPULSE_QUALITY_LOG_FILE })
+  : null;
+const monitoringIntervalMs = Math.max(30, Number(process.env.GRIDPULSE_QUALITY_INTERVAL_MINUTES ?? 60)) * 60_000;
+let qualityMonitorTimer;
 
 function liveSourceWithFreshness(mix) {
   const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
@@ -59,10 +65,14 @@ function serveStatic(pathname, response) {
 
 export async function handleRequest(request, response) {
     const url = new URL(request.url ?? '/', 'http://localhost');
-    if (request.method !== 'GET') return json(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'This demo API is read-only.' } });
+    if (request.method !== 'GET' && !(request.method === 'POST' && url.pathname === '/api/v1/monitoring/quality/check')) return json(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'This demo API is read-only.' } });
 
     if (url.pathname === '/health/live') return json(response, 200, { status: 'ok' });
     if (url.pathname === '/health/ready') return json(response, 200, { status: 'ready', persistence: LIVE_MODE ? 'none' : 'fixture', provider: LIVE_MODE ? 'entsoe' : 'synthetic-demo' });
+    if (url.pathname === '/api/v1/monitoring/quality') {
+      if (!LIVE_MODE || !qualityMonitor) return json(response, 404, { error: { code: 'NOT_AVAILABLE', message: 'Quality monitoring is not enabled.' } });
+      return json(response, 200, { monitoring: qualityMonitor.summary() });
+    }
     if (url.pathname === '/api/v1/countries') return json(response, 200, { countries: LIVE_MODE
       ? [{ code: 'HU', name: 'Hungary', provider_zone_code: '10YHU-MAVIR----U', data_status: 'actual' }]
       : getCountries() });
@@ -77,7 +87,8 @@ export async function handleRequest(request, response) {
       if (LIVE_MODE) {
         try {
           const force = url.searchParams.get('refresh') === 'true';
-          const mix = liveSourceWithFreshness(await getLiveMix({ force }));
+          const rawMix = await getLiveMix({ force });
+          const mix = liveSourceWithFreshness(rawMix);
           const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
           return json(response, 200, { generated_at_utc: mix.generated_at_utc, data_status: 'actual', summary: [{
             ...mix.country,
@@ -99,7 +110,8 @@ export async function handleRequest(request, response) {
       if (LIVE_MODE) {
         try {
           const force = url.searchParams.get('refresh') === 'true';
-          series = liveSourceWithFreshness(await getLiveMix({ force }));
+          const rawMix = await getLiveMix({ force });
+          series = liveSourceWithFreshness(rawMix);
         } catch {
           return json(response, 502, { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Live ENTSO-E data is temporarily unavailable.' } });
         }
@@ -120,13 +132,30 @@ export async function handleRequest(request, response) {
 }
 
 export function createAppServer() {
-  return createServer(handleRequest);
+  const server = createServer(handleRequest);
+  if (qualityMonitor) {
+    const check = async () => {
+      try {
+        qualityMonitor.recordSuccess(await getLiveMix({ force: true }));
+      } catch {
+        qualityMonitor.recordFailure();
+      }
+    };
+    void check();
+    qualityMonitorTimer = setInterval(check, monitoringIntervalMs);
+    qualityMonitorTimer.unref();
+    server.on('close', () => clearInterval(qualityMonitorTimer));
+  }
+  return server;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const server = createAppServer();
   const port = Number(process.env.PORT ?? 8787);
   const bindAddress = process.env.GRIDPULSE_BIND_ADDRESS ?? '127.0.0.1';
-  server.listen(port, bindAddress, () => console.log(`GridPulse Europe listening on http://${bindAddress}:${port}`));
+  server.listen(port, bindAddress);
+  server.on('listening', () => {
+    console.log(`GridPulse Europe listening on http://${bindAddress}:${port}`);
+  });
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));
 }
