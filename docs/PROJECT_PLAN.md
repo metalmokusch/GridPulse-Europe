@@ -19,7 +19,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - First demo vertical slice implemented with native Node.js ESM, built-in HTTP, static HTML/CSS/JavaScript, synthetic HU/AT/DE fixtures, health/data endpoints, responsive dashboard, SVG chart, comparison cards, and table alternative.
 - Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs remain based on all sources.
 - Dashboard country, period, and source selections are encoded in the URL so selected views can be shared and restored.
-- Thirty-three offline Node.js tests cover dashboard demo/live rendering, health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, dashboard URL state, ENTSO-E client/parsing/normalization and private live routes, input validation, and static asset delivery.
+- Thirty-four offline Node.js tests cover dashboard demo/live rendering, health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, dashboard URL state, ENTSO-E client/parsing/normalization and private live routes, privacy-safe quality monitoring, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials are required. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
 - GitHub Actions has successfully checked the dashboard and container build, using a Node.js 20/22/24 test matrix.
 - Dockerfile and Compose configuration now package the fixture-only demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. GitHub Actions builds the container image. No data volume is configured before persistence exists.
@@ -35,6 +35,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Live dashboard labels identify ENTSO-E, show reported-only totals, leave missing intervals blank, and withhold renewable share while coverage is incomplete. Live mode is designed for the owner's private instance, not for public exposure or redistribution.
 - Live mode classifies age from the latest period end: fresh through 90 minutes, delayed through 3 hours, then stale. These provisional thresholds are documented in ADR 0005.
 - Live mode refreshes automatically every 15 minutes; the manual refresh button bypasses the five-minute memory cache. Requests remain server-side and no observations are persisted.
+- The private ENTSO-E Compose overlay runs an independent hourly quality check and appends metadata-only records to a persistent host-mounted JSONL log. The dashboard displays rolling 24-hour success, freshness, interval coverage, and sparse category summaries. Production quantities and credentials are not logged.
 
 ## External dependency backlog
 
@@ -43,4 +44,4 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Immediate next task
 
-Review live mode's freshness label and chart/table behavior against a few days of HU data. Continue to keep the service private and non-persistent. Before sharing or publishing results, obtain written reuse clarification for item 16.1.B&C. Complete the dashboard product slice before adding more countries. Docker/OMV deployment remains a final-stage task as requested.
+Deploy the private live mode to OMV and observe its metadata-only quality history for several days. Review freshness, interval coverage, sparse categories, and dashboard behavior. Before sharing or publishing results, obtain written reuse clarification for item 16.1.B&C. Complete the dashboard product slice before adding more countries.
