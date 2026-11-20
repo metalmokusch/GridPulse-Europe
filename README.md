@@ -38,6 +38,8 @@ The ENTSO-E Compose overlay also stores a local quality log at `${GRIDPULSE_DATA
 
 The app currently supports only the validated HU zone in live mode. Responses are cached in memory for five minutes; manual refresh bypasses that cache and live mode refreshes automatically every 15 minutes. No provider values are persisted. Freshness is classified from the latest market period end using provisional 90-minute/3-hour thresholds. Unconfirmed/missing categories remain visible as gaps and renewable share is withheld. The existing server has no login, so keep the default host binding at `127.0.0.1` and do not expose live mode to a network you do not control. Live mode stays opt-in and is not part of the public demo.
 
+The private OMV instance has been deployed and the owner confirmed access from the home LAN. Its host binding is overridden to `0.0.0.0`; because the dashboard has no login, keep it limited to a trusted LAN and do not forward the port to the public internet.
+
 ## Run locally
 
 Requires Node.js 20 or newer.

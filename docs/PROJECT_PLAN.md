@@ -11,7 +11,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 3. **Bootstrap demo-first vertical slice:** complete. API health/readiness, synthetic fixture data, and a responsive dashboard with explicit time/unit/status and tabular fallback run without external credentials.
 4. **Build data contracts and persistence:** provider-neutral UTC observation validation, versioned taxonomy, safe renewable-share calculation, and configurable freshness classifier are implemented and covered by offline tests. Country/zone distinction is preserved. A single-instance SQLite persistence boundary is the provisional direction; package choice, migrations, adapter-owned category maps, and idempotent storage remain open (see ADR 0004).
 5. **Add provider adapter:** access and HU query behavior are validated. Private HU live mode is opt-in, server-side, non-persistent, and limited to one validated zone. Wider use still requires written reuse clarification and a coverage policy.
-6. **Complete analytics and operations:** comparison/history, accessible chart/table states, Compose deployment, persistent data, backup/restore, security checks, and OMV validation.
+6. **Complete analytics and operations:** the responsive dashboard, Compose deployment, and initial OMV validation are complete. Multi-day live-feed monitoring is underway. Historical analytics, persistence of source observations, backup/restore, and broader security review remain open.
 
 ## Current state
 
@@ -36,6 +36,7 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Live mode classifies age from the latest period end: fresh through 90 minutes, delayed through 3 hours, then stale. These provisional thresholds are documented in ADR 0005.
 - Live mode refreshes automatically every 15 minutes; the manual refresh button bypasses the five-minute memory cache. Requests remain server-side and no observations are persisted.
 - The private ENTSO-E Compose overlay runs an independent hourly quality check and appends metadata-only records to a persistent host-mounted JSONL log. The dashboard displays rolling 24-hour success, freshness, interval coverage, and sparse category summaries. Production quantities and credentials are not logged.
+- The private live container is running on the OMV host and is healthy. The owner confirmed dashboard access over the home LAN. The first background check succeeded: 96/96 intervals had at least one reported category; B05, B06, and B09 were flagged by the heuristic sparse-category check. This is an initial sample, not a multi-day conclusion.
 
 ## External dependency backlog
 
@@ -44,4 +45,4 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 
 ## Immediate next task
 
-Deploy the private live mode to OMV and observe its metadata-only quality history for several days. Review freshness, interval coverage, sparse categories, and dashboard behavior. Before sharing or publishing results, obtain written reuse clarification for item 16.1.B&C. Complete the dashboard product slice before adding more countries.
+Leave the private live mode running on OMV for several days, then review the metadata-only quality history for freshness, interval coverage, sparse categories, and request failures. Before sharing or publishing results, obtain written reuse clarification for item 16.1.B&C. Complete the dashboard product slice before adding more countries.
