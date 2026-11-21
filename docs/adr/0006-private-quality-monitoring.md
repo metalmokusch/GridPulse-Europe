@@ -10,8 +10,10 @@ The ENTSO-E live mode needs multi-day observation on the owner's OMV host. The d
 ## Decision
 
 - Run an independent hourly provider check by default (minimum interval 30 minutes), append one compact quality record to a local JSON Lines file on a persistent host-mounted directory, and avoid requiring an open dashboard.
-- Record request result, check timestamp, latest period age in minutes, expected/observed/missing interval counts, source category IDs, and a sparse/unmapped indicator. Do not record production quantities, response XML/text, URLs containing credentials, or the API token.
-- Show a rolling 24-hour summary in the dashboard. Read at most the most recent 2,880 records; the file may be compacted during a future maintenance task.
+- Record request result, check timestamp, latest period age in minutes, full-window expected/observed/missing intervals, mature-window expected/observed/missing intervals, recent intervals still within H+1, source category IDs, a sparse/unmapped indicator, and a bounded failure classification (for example HTTP_503, REQUEST_TIMEOUT, PROVIDER_REJECTED, EMPTY_RESPONSE, or INVALID_RESPONSE). Unknown error details collapse to `UNCLASSIFIED`. Never persist exception messages, production quantities, response XML/text, URLs containing credentials, or the API token.
+- For the monitor only, classify an interval as mature once its period end is at least 60 minutes before the check time. This follows the provider's stated H+1 deadline; it is a reporting grace window, not an attestation that the provider always publishes exactly one hour later.
+- Legacy log rows do not contain interval timestamps/counts needed for this split. Do not infer their mature coverage; show it as unavailable until new-format checks have been recorded.
+- Show a rolling 24-hour summary in the dashboard, including both raw 24-hour coverage and coverage after the H+1 grace window. Read at most the most recent 2,880 records; the file may be compacted during a future maintenance task.
 - Keep quality logging opt-in through `GRIDPULSE_QUALITY_LOG_FILE`; enable it only in the separate private ENTSO-E Compose overlay.
 - Do not use this log as an observation database. No source values are persisted.
 

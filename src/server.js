@@ -65,7 +65,7 @@ function serveStatic(pathname, response) {
 
 export async function handleRequest(request, response) {
     const url = new URL(request.url ?? '/', 'http://localhost');
-    if (request.method !== 'GET' && !(request.method === 'POST' && url.pathname === '/api/v1/monitoring/quality/check')) return json(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'This demo API is read-only.' } });
+    if (request.method !== 'GET') return json(response, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'This demo API is read-only.' } });
 
     if (url.pathname === '/health/live') return json(response, 200, { status: 'ok' });
     if (url.pathname === '/health/ready') return json(response, 200, { status: 'ready', persistence: LIVE_MODE ? 'none' : 'fixture', provider: LIVE_MODE ? 'entsoe' : 'synthetic-demo' });
@@ -137,8 +137,8 @@ export function createAppServer() {
     const check = async () => {
       try {
         qualityMonitor.recordSuccess(await getLiveMix({ force: true }));
-      } catch {
-        qualityMonitor.recordFailure();
+      } catch (error) {
+        qualityMonitor.recordFailure(error?.qualityCode);
       }
     };
     void check();

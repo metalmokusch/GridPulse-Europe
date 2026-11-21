@@ -15,18 +15,20 @@ This contract is provider-neutral. It does not claim that the ENTSO-E item or it
 | `fetched_at_utc` | Time this application fetched the value |
 | `source_category` | Exact provider/source category identifier, preserved verbatim |
 | `normalized_category` | Versioned GridPulse category; use `unknown` when no safe mapping exists |
-| `taxonomy_version` | Exact version used to classify `normalized_category` (currently `1.0.0`) |
-| `value`, `unit` | Finite, non-negative number and explicit `MW` or `MWh` |
+| `taxonomy_version` | Exact version used to classify `normalized_category` (currently `1.2.0`) |
+| `value`, `unit` | Finite number and explicit `MW` or `MWh`; negative values are valid only for pumped hydro storage (`hydro_pumped_storage`) because ENTSO-E B10 uses negative values while pumping |
 | `data_status` | `actual`, `forecast`, `estimate`, `unknown`, or `synthetic` |
 | `quality_flags` | Zero or more non-empty diagnostic flags |
 
 The validator requires UTC `Z` timestamps and a positive period. It rejects unsupported units, statuses, categories, and invalid values. It canonicalizes timestamps to millisecond precision and de-duplicates quality flags.
 
-## Taxonomy v1.0.0
+## Taxonomy v1.2.0
 
-Normalized categories: `solar`, `wind_onshore`, `wind_offshore`, `hydro`, `biomass`, `geothermal`, `nuclear`, `coal`, `gas`, `oil`, `other_fossil`, `other`, and `unknown`.
+Normalized categories: `solar`, `wind_onshore`, `wind_offshore`, `hydro`, `hydro_pumped_storage`, `biomass`, `geothermal`, `other_renewable`, `nuclear`, `coal`, `gas`, `oil`, `other_fossil`, `other`, and `unknown`.
 
-Renewable-share membership is explicitly defined as solar, onshore/offshore wind, hydro, biomass, and geothermal. Nuclear is excluded. This domain taxonomy does not establish how any provider category maps to these values; mapping tables remain adapter-owned and must be documented and tested separately.
+Renewable-share membership is explicitly defined as solar, onshore/offshore wind, hydro, biomass, geothermal, and other renewables. Nuclear is excluded. This domain taxonomy does not establish how any provider category maps to these values; mapping tables remain adapter-owned and must be documented and tested separately.
+
+Pumped hydro storage is kept separate from renewable hydro and excluded from renewable-share calculations. ENTSO-E B10 values can be positive in generating mode or negative in pumping mode; preserve the sign so reported net generation totals remain meaningful. Other categories continue to reject negative values.
 
 ## Mix summary policy
 

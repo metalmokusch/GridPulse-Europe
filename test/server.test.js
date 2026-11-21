@@ -39,9 +39,11 @@ test('countries endpoint keeps country and demo zone metadata explicit', async (
 test('category endpoint exposes a versioned normalized taxonomy', async () => {
   const result = await request('/api/v1/categories');
   assert.equal(result.status, 200);
-  assert.equal(result.json().taxonomy_version, '1.0.0');
+  assert.equal(result.json().taxonomy_version, '1.2.0');
   assert.equal(result.json().categories.find(({ id }) => id === 'unknown').renewable, false);
   assert.equal(result.json().categories.find(({ id }) => id === 'wind_offshore').renewable, true);
+  assert.equal(result.json().categories.find(({ id }) => id === 'other_renewable').renewable, true);
+  assert.equal(result.json().categories.find(({ id }) => id === 'hydro_pumped_storage').renewable, false);
 });
 
 test('generation mix provides 24 UTC periods with explicit units and synthetic status', async () => {
@@ -70,6 +72,9 @@ test('summary rejects unknown countries and returns selected summaries', async (
 test('read-only API, static dashboard assets, and unknown routes behave predictably', async () => {
   const method = await request('/api/v1/countries', 'POST');
   assert.equal(method.status, 405);
+  const monitoringPost = await request('/api/v1/monitoring/quality/check', 'POST');
+  assert.equal(monitoringPost.status, 405);
+  assert.equal(monitoringPost.json().error.code, 'METHOD_NOT_ALLOWED');
   const page = await request('/');
   assert.equal(page.status, 200);
   assert.match(page.headers['content-type'], /text\/html/);

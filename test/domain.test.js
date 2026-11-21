@@ -25,13 +25,15 @@ function observation(overrides = {}) {
 }
 
 test('taxonomy is versioned and renewable categories are explicit', () => {
-  assert.equal(TAXONOMY_VERSION, '1.0.0');
+  assert.equal(TAXONOMY_VERSION, '1.2.0');
   assert.deepEqual(CATEGORY_TAXONOMY.map(({ id }) => id), [
-    'solar', 'wind_onshore', 'wind_offshore', 'hydro', 'biomass', 'geothermal',
+    'solar', 'wind_onshore', 'wind_offshore', 'hydro', 'hydro_pumped_storage', 'biomass', 'geothermal', 'other_renewable',
     'nuclear', 'coal', 'gas', 'oil', 'other_fossil', 'other', 'unknown'
   ]);
   assert.equal(isRenewableCategory('nuclear'), false);
   assert.equal(isRenewableCategory('wind_offshore'), true);
+  assert.equal(isRenewableCategory('other_renewable'), true);
+  assert.equal(isRenewableCategory('hydro_pumped_storage'), false);
 });
 
 test('observation normalization preserves source fields and canonicalizes UTC timestamps', () => {
@@ -57,22 +59,29 @@ test('observations reject invalid UTC timestamps, intervals, units, statuses, an
   assert.throws(() => observation({ period_end_utc: '2026-11-19T10:00:00Z' }), /later than/);
   assert.throws(() => observation({ unit: 'kW' }), /unit must/);
   assert.throws(() => observation({ data_status: 'estimated-ish' }), /data_status must/);
-  assert.throws(() => observation({ value: -0.1 }), /non-negative/);
+  assert.throws(() => observation({ value: -0.1 }), /negative values/);
   assert.throws(() => observation({ value: Number.NaN }), /finite/);
   assert.throws(() => observation({ normalized_category: 'made_up' }), /normalized_category/);
   assert.throws(() => observation({ taxonomy_version: '0.9.0' }), /taxonomy_version/);
+});
+
+test('pumped hydro storage accepts negative pumping and positive generation values', () => {
+  assert.equal(observation({ source_category: 'B10', normalized_category: 'hydro_pumped_storage', value: -125 }).value, -125);
+  assert.equal(observation({ source_category: 'B10', normalized_category: 'hydro_pumped_storage', value: 80 }).value, 80);
+  assert.throws(() => observation({ normalized_category: 'solar', value: -1 }), /negative values/);
 });
 
 test('mix summary computes renewable share only for complete, known coverage', () => {
   const rows = [
     observation({ source_category: 'SOLAR', normalized_category: 'solar', value: 25 }),
     observation({ source_category: 'WIND', normalized_category: 'wind_onshore', value: 15 }),
+    observation({ source_category: 'B15', normalized_category: 'other_renewable', value: 5 }),
     observation({ source_category: 'GAS', normalized_category: 'gas', value: 60 })
   ];
   const result = summarizeGenerationMix(rows, { coverage_complete: true });
-  assert.equal(result.total_value, 100);
-  assert.equal(result.renewable_value, 40);
-  assert.equal(result.renewable_share_pct, 40);
+  assert.equal(result.total_value, 105);
+  assert.equal(result.renewable_value, 45);
+  assert.equal(result.renewable_share_pct, Number((45 / 105 * 100).toFixed(1)));
   assert.equal(result.share_unavailable_reason, null);
 
   const incomplete = summarizeGenerationMix(rows);

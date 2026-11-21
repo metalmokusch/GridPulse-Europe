@@ -2,7 +2,8 @@ import { parseDashboardState, serializeDashboardState } from './dashboard-state.
 
 const COLORS = {
   wind_onshore: '#48c6a6', solar: '#f2bb63', hydro: '#68a8ef',
-  wind_offshore: '#37a78b', biomass: '#5aa46c', geothermal: '#bb8056',
+  wind_offshore: '#37a78b', hydro_pumped_storage: '#5476a8', biomass: '#5aa46c', geothermal: '#bb8056',
+  other_renewable: '#72b38a',
   nuclear: '#a991ed', gas: '#f17d77', coal: '#9ca8b5', oil: '#796b62',
   other_fossil: '#b77c69', other: '#788697', unknown: '#657386'
 };
@@ -125,26 +126,34 @@ function renderChart(series) {
     .map((item) => [`${item.category}:${item.label}`, item])).values()];
   const width = 760; const height = 252; const left = 56; const right = 16; const top = 14; const bottom = 34;
   const plotWidth = width - left - right; const plotHeight = height - top - bottom;
-  const max = Math.max(1, ...observations.map((observation) => observation.values
-    .filter(({ category }) => state.selectedCategories.includes(category))
-    .reduce((sum, item) => sum + item.value, 0))) * 1.15;
+  const visibleValues = observations.map((observation) => observation.values
+    .filter(({ category }) => state.selectedCategories.includes(category)));
+  const max = Math.max(0, ...visibleValues.map((values) => values.reduce((sum, item) => sum + Math.max(0, item.value), 0))) * 1.15 || 1;
+  const min = Math.min(0, ...visibleValues.map((values) => values.reduce((sum, item) => sum + Math.min(0, item.value), 0))) * 1.15;
+  const valueRange = max - min || 1;
+  const yForValue = (value) => top + (max - value) / valueRange * plotHeight;
   const step = plotWidth / observations.length; const barWidth = Math.max(4, step * 0.62);
   const grid = [0, 0.25, 0.5, 0.75, 1];
   const visibleSourceNames = categories.map(({ label }) => label).join(', ');
   let svg = `<svg class="mix-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="mix-chart-title" aria-describedby="mix-chart-desc"><title id="mix-chart-title">Electricity generation profile for ${escapeHtml(primary.country.name)}</title><desc id="mix-chart-desc">Stacked ${Math.round(intervalMs / 60_000)}-minute megawatt observations for the last ${state.periodHours} hours, showing ${escapeHtml(visibleSourceNames)}.</desc>`;
   grid.forEach((fraction) => {
-    const y = top + plotHeight * (1 - fraction);
-    svg += `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="grid-line"/><text x="${left - 9}" y="${y + 4}" text-anchor="end" class="axis-label">${fmtNumber(max * fraction / 1000)}k</text>`;
+    const value = max - valueRange * fraction;
+    const y = yForValue(value);
+    svg += `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="grid-line"/><text x="${left - 9}" y="${y + 4}" text-anchor="end" class="axis-label">${fmtNumber(value / 1000)}k</text>`;
   });
   observations.forEach((observation, index) => {
-    let stacked = 0;
+    let positiveStack = 0;
+    let negativeStack = 0;
     observation.values.filter(({ category }) => state.selectedCategories.includes(category)).forEach((item) => {
-      const barHeight = item.value / max * plotHeight;
+      const start = item.value >= 0 ? positiveStack : negativeStack;
+      const end = start + item.value;
       const x = left + index * step + (step - barWidth) / 2;
-      const y = top + plotHeight - (stacked + item.value) / max * plotHeight;
-      const opacity = item.value > 0 ? 0.9 : 0;
-      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.max(0, barHeight).toFixed(1)}" rx="2" fill="${COLORS[item.category] ?? COLORS.unknown}" opacity="${opacity}"><title>${fmtTime(observation.period_end_utc)} · ${escapeHtml(item.label)}: ${fmtNumber(item.value)} MW</title></rect>`;
-      stacked += item.value;
+      const y1 = yForValue(start);
+      const y2 = yForValue(end);
+      const opacity = item.value !== 0 ? 0.9 : 0;
+      svg += `<rect x="${x.toFixed(1)}" y="${Math.min(y1, y2).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.abs(y2 - y1).toFixed(1)}" rx="2" fill="${COLORS[item.category] ?? COLORS.unknown}" opacity="${opacity}"><title>${fmtTime(observation.period_end_utc)} · ${escapeHtml(item.label)}: ${fmtNumber(item.value)} MW</title></rect>`;
+      if (item.value >= 0) positiveStack = end;
+      else negativeStack = end;
     });
     if (index % 4 === 0 || index === observations.length - 1) {
       const x = left + index * step + step / 2;
@@ -235,11 +244,23 @@ function renderQualityMonitor(monitoring) {
   $('#quality-stats').innerHTML = latest ? `
     <article><strong>${latest.freshness_minutes ?? '—'} min</strong><span>Latest period age</span></article>
     <article><strong>${latest.intervals_observed}/${latest.intervals_expected}</strong><span>Reported intervals · last fetch</span></article>
-    <article><strong>${monitoring.mean_observed_interval_pct ?? '—'}%</strong><span>Mean interval coverage</span></article>
+    <article><strong>${latest.intervals_matured_observed ?? '—'}/${latest.intervals_matured_expected ?? '—'}</strong><span>Reported intervals older than 1 h</span></article>
+    <article><strong>${monitoring.mean_matured_interval_pct ?? '—'}%</strong><span>Mean mature interval coverage</span></article>
     <article><strong>${escapeHtml(latest.source_categories.join(', ') || '—')}</strong><span>Source category codes</span></article>` : '';
+  $('#quality-pending').textContent = latest
+    ? latest.intervals_pending === null
+      ? 'Publication-window breakdown is not available for this older check.'
+      : latest.intervals_pending
+        ? `${latest.intervals_pending} recent intervals are still within the H+1 publication window; ${latest.intervals_pending_observed} already have data. ${latest.intervals_missing_matured} intervals older than that window are missing.`
+        : 'No intervals remain within the H+1 publication window.'
+    : '';
   $('#quality-sparse').textContent = latest?.sparse_category_ids?.length
     ? `Sparse categories in last fetch: ${latest.sparse_category_ids.join(', ')}`
     : latest ? 'No sparse category series detected in the last fetch.' : '';
+  const failureCodes = Object.entries(monitoring.failure_codes ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  $('#quality-failures').textContent = failureCodes.length
+    ? `Failed check classifications: ${failureCodes.map(([code, count]) => `${code} (${count})`).join(', ')}`
+    : '';
 }
 
 async function loadQualityMonitor() {

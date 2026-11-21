@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeEntsoeGeneration } from '../src/providers/entsoe/normalize-generation.js';
+import { ENTSOE_PSR_TYPES } from '../src/providers/entsoe/psr-types.js';
 
 const FETCHED_AT = '2026-11-20T17:05:00.000Z';
 
@@ -32,7 +33,7 @@ test('normalizes ENTSO-E 15-minute points with UTC source periods and explicit p
   assert.equal(result.coverage_complete, false);
 });
 
-test('keeps ambiguous source categories unknown and reports their source identifiers', () => {
+test('maps ENTSO-E other renewable and other non-renewable types, and keeps mixed waste unclassified', () => {
   const result = normalizeEntsoeGeneration(xmlFor([
     { category: 'B15', points: [{ position: 1, quantity: '8' }] },
     { category: 'B17', points: [{ position: 1, quantity: '9' }] },
@@ -41,13 +42,33 @@ test('keeps ambiguous source categories unknown and reports their source identif
   ]), { sourceZone: '10YHU-MAVIR----U', fetchedAtUtc: FETCHED_AT });
 
   assert.deepEqual(result.observations.map(({ source_category, normalized_category }) => [source_category, normalized_category]), [
-    ['B15', 'unknown'], ['B17', 'unknown'], ['B20', 'unknown'], ['B99', 'unknown']
+    ['B15', 'other_renewable'], ['B17', 'unknown'], ['B20', 'other'], ['B99', 'unknown']
   ]);
+  assert.deepEqual(result.observations.map(({ quality_flags }) => quality_flags.includes('entsoe_source_category_unclassified:B17')),
+    [false, true, false, false]);
   assert.deepEqual(result.warnings, [
-    'unmapped_source_category:B15', 'unmapped_source_category:B17',
-    'unmapped_source_category:B20', 'unmapped_source_category:B99',
+    'unclassified_source_category:B17', 'unmapped_source_category:B99',
     'coverage_not_attested', 'missing_points_not_filled'
   ]);
+});
+
+test('covers all ENTSO-E PSR codes and retains signed pumped-storage observations', () => {
+  const expected = [
+    ['B01', 'biomass'], ['B02', 'coal'], ['B03', 'other_fossil'], ['B04', 'gas'],
+    ['B05', 'coal'], ['B06', 'oil'], ['B07', 'other_fossil'], ['B08', 'other_fossil'],
+    ['B09', 'geothermal'], ['B10', 'hydro_pumped_storage'], ['B11', 'hydro'], ['B12', 'hydro'],
+    ['B13', 'other_renewable'], ['B14', 'nuclear'], ['B15', 'other_renewable'], ['B16', 'solar'],
+    ['B17', 'unknown'], ['B18', 'wind_offshore'], ['B19', 'wind_onshore'], ['B20', 'other']
+  ];
+  assert.deepEqual(Object.keys(ENTSOE_PSR_TYPES), expected.map(([category]) => category));
+  const result = normalizeEntsoeGeneration(xmlFor(expected.map(([category], index) => ({
+    category,
+    points: [{ position: 1, quantity: category === 'B10' ? '-12' : String(index + 1) }]
+  }))), { sourceZone: '10YHU-MAVIR----U', fetchedAtUtc: FETCHED_AT });
+
+  assert.deepEqual(result.observations.map(({ source_category, normalized_category }) => [source_category, normalized_category]), expected);
+  assert.equal(result.observations.find(({ source_category }) => source_category === 'B10').value, -12);
+  assert.equal(result.warnings.includes('unmapped_source_category:B17'), false);
 });
 
 test('preserves sparse and repeated category series without filling missing points or merging series', () => {

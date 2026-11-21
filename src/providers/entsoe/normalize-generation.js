@@ -4,16 +4,28 @@ import { TAXONOMY_VERSION } from '../../domain/categories.js';
 const CATEGORY_MAP = Object.freeze({
   B01: 'biomass',
   B02: 'coal',
+  B03: 'other_fossil',
   B04: 'gas',
   B05: 'coal',
   B06: 'oil',
+  B07: 'other_fossil',
+  B08: 'other_fossil',
   B09: 'geothermal',
+  B10: 'hydro_pumped_storage',
   B11: 'hydro',
   B12: 'hydro',
+  B13: 'other_renewable',
   B14: 'nuclear',
+  B15: 'other_renewable',
   B16: 'solar',
-  B19: 'wind_onshore'
+  B17: 'unknown',
+  B18: 'wind_offshore',
+  B19: 'wind_onshore',
+  B20: 'other'
 });
+
+const KNOWN_UNCLASSIFIED_CATEGORIES = new Set(['B17']);
+const SIGNED_VALUE_CATEGORIES = new Set(['B10']);
 
 function elementText(xml, name) {
   return xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([^<]*)<\\/${name}>`, 'i'))?.[1]?.trim() ?? null;
@@ -46,7 +58,11 @@ export function normalizeEntsoeGeneration(xml, { sourceZone, fetchedAtUtc = new 
     const rawCategory = elementText(seriesXml, 'psrType');
     const sourceCategory = rawCategory || 'UNSPECIFIED';
     const normalizedCategory = CATEGORY_MAP[sourceCategory] ?? 'unknown';
-    if (normalizedCategory === 'unknown') warnings.add(`unmapped_source_category:${sourceCategory}`);
+    if (KNOWN_UNCLASSIFIED_CATEGORIES.has(sourceCategory)) {
+      warnings.add(`unclassified_source_category:${sourceCategory}`);
+    } else if (normalizedCategory === 'unknown') {
+      warnings.add(`unmapped_source_category:${sourceCategory}`);
+    }
 
     const periods = [...seriesXml.matchAll(/<Period\b[^>]*>([\s\S]*?)<\/Period>/gi)].map(([, value]) => value);
     for (const [periodIndex, periodXml] of periods.entries()) {
@@ -59,7 +75,9 @@ export function normalizeEntsoeGeneration(xml, { sourceZone, fetchedAtUtc = new 
         const quantityText = elementText(pointXml, 'quantity');
         const value = quantityText === null ? NaN : Number(quantityText);
         if (!Number.isSafeInteger(position) || position <= 0) throw new TypeError('ENTSO-E Point.position must be a positive integer.');
-        if (!Number.isFinite(value) || value < 0) throw new TypeError('ENTSO-E Point.quantity must be a finite non-negative number.');
+        if (!Number.isFinite(value) || (value < 0 && !SIGNED_VALUE_CATEGORIES.has(sourceCategory))) {
+          throw new TypeError('ENTSO-E Point.quantity must be finite; negative values are supported only for B10 pumped storage.');
+        }
 
         const periodStart = new Date(start.getTime() + (position - 1) * resolution);
         const periodEnd = new Date(periodStart.getTime() + resolution);
@@ -80,6 +98,7 @@ export function normalizeEntsoeGeneration(xml, { sourceZone, fetchedAtUtc = new 
           quality_flags: [
             'entsoe_mkt_psr_type',
             'entsoe_actual_generation_may_include_estimates',
+            ...(KNOWN_UNCLASSIFIED_CATEGORIES.has(sourceCategory) ? [`entsoe_source_category_unclassified:${sourceCategory}`] : []),
             `entsoe_series_${seriesIndex + 1}_period_${periodIndex + 1}`
           ]
         }));

@@ -1,13 +1,25 @@
 import { readFileSync } from 'node:fs';
 import { normalizeEntsoeGeneration } from './normalize-generation.js';
+import { parseEntsoeResponse } from './parse-response.js';
 import { ENTSOE_PSR_TYPES } from './psr-types.js';
 
 const API_URL = 'https://web-api.tp.entsoe.eu/api';
 
+function providerError(qualityCode, message) {
+  const error = new Error(message);
+  error.qualityCode = qualityCode;
+  return error;
+}
+
 function readToken() {
   const file = process.env.ENTSOE_API_TOKEN_FILE;
-  const token = file ? readFileSync(file, 'utf8').trim() : process.env.ENTSOE_API_TOKEN?.trim();
-  if (!token) throw new Error('ENTSO-E token is not configured.');
+  let token;
+  try {
+    token = file ? readFileSync(file, 'utf8').trim() : process.env.ENTSOE_API_TOKEN?.trim();
+  } catch {
+    throw providerError('TOKEN_UNAVAILABLE', 'ENTSO-E token is not available.');
+  }
+  if (!token) throw providerError('TOKEN_UNAVAILABLE', 'ENTSO-E token is not configured.');
   return token;
 }
 
@@ -17,7 +29,7 @@ function periodParameter(date) {
 
 export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new Date() }) {
   if (countryCode !== 'HU' || sourceZone !== '10YHU-MAVIR----U') {
-    throw new Error('Live ENTSO-E mode currently supports only the validated HU bidding zone.');
+    throw providerError('UNSUPPORTED_ZONE', 'Live ENTSO-E mode currently supports only the validated HU bidding zone.');
   }
 
   const periodEnd = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000);
@@ -31,21 +43,39 @@ export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new
     periodEnd: periodParameter(periodEnd)
   });
 
-  const response = await fetch(`${API_URL}?${params}`, {
-    headers: { accept: 'application/xml' },
-    signal: AbortSignal.timeout(30_000)
-  });
-  const xml = await response.text();
-  if (!response.ok) throw new Error(`ENTSO-E returned HTTP ${response.status}.`);
+  let response;
+  try {
+    response = await fetch(`${API_URL}?${params}`, {
+      headers: { accept: 'application/xml' },
+      signal: AbortSignal.timeout(30_000)
+    });
+  } catch (error) {
+    throw providerError(error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR', 'ENTSO-E request failed.');
+  }
+  let xml;
+  try {
+    xml = await response.text();
+  } catch {
+    throw providerError('RESPONSE_READ_ERROR', 'ENTSO-E response could not be read.');
+  }
+  if (!response.ok) throw providerError(`HTTP_${response.status}`, 'ENTSO-E returned an unsuccessful HTTP status.');
+
+  if (/<Acknowledgement_MarketDocument\b/i.test(xml)) {
+    throw providerError('PROVIDER_REJECTED', 'ENTSO-E rejected the request.');
+  }
+  const responseMetadata = parseEntsoeResponse(xml);
+  if (!responseMetadata.timeseries_count || !responseMetadata.point_count) {
+    throw providerError('EMPTY_RESPONSE', 'ENTSO-E returned no quantity points for the requested period.');
+  }
 
   let normalized;
   try {
     normalized = normalizeEntsoeGeneration(xml, { sourceZone, fetchedAtUtc: now.toISOString() });
   } catch {
-    throw new Error('ENTSO-E response could not be normalized.');
+    throw providerError('INVALID_RESPONSE', 'ENTSO-E response could not be normalized.');
   }
   if (normalized.observations.some(({ period_start_utc, period_end_utc }) => Date.parse(period_end_utc) - Date.parse(period_start_utc) !== 15 * 60_000)) {
-    throw new Error('ENTSO-E returned an unvalidated resolution.');
+    throw providerError('UNSUPPORTED_RESOLUTION', 'ENTSO-E returned an unvalidated resolution.');
   }
 
   const byPeriod = new Map();
@@ -81,7 +111,7 @@ export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new
   }
 
   const observed = [...byPeriod.values()].sort((a, b) => a.period_end_utc.localeCompare(b.period_end_utc));
-  if (!observed.length) throw new Error('ENTSO-E returned no observations for the requested period.');
+  if (!observed.length) throw providerError('EMPTY_RESPONSE', 'ENTSO-E returned no observations for the requested period.');
   const intervalMs = 15 * 60_000;
   const observations = Array.from({ length: 96 }, (_, index) => {
     const start = new Date(periodStart.getTime() + index * intervalMs);

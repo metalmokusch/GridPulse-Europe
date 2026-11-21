@@ -58,8 +58,9 @@ export function normalizeGenerationObservation(input) {
   if (observation.taxonomy_version !== TAXONOMY_VERSION) {
     throw new TypeError(`taxonomy_version must be ${TAXONOMY_VERSION}.`);
   }
-  if (!Number.isFinite(observation.value) || observation.value < 0) {
-    throw new TypeError('value must be a finite, non-negative number.');
+  const signedCategory = observation.normalized_category === 'hydro_pumped_storage';
+  if (!Number.isFinite(observation.value) || (observation.value < 0 && !signedCategory)) {
+    throw new TypeError('value must be finite; negative values are allowed only for pumped hydro storage.');
   }
   if (!UNITS.has(observation.unit)) throw new TypeError('unit must be MW or MWh.');
   if (!STATUSES.has(observation.data_status)) {

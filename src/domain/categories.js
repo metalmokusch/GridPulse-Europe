@@ -1,12 +1,14 @@
-export const TAXONOMY_VERSION = '1.0.0';
+export const TAXONOMY_VERSION = '1.2.0';
 
 export const CATEGORY_TAXONOMY = Object.freeze([
   { id: 'solar', label: 'Solar', renewable: true },
   { id: 'wind_onshore', label: 'Onshore wind', renewable: true },
   { id: 'wind_offshore', label: 'Offshore wind', renewable: true },
   { id: 'hydro', label: 'Hydro', renewable: true },
+  { id: 'hydro_pumped_storage', label: 'Pumped hydro storage (net)', renewable: false },
   { id: 'biomass', label: 'Biomass', renewable: true },
   { id: 'geothermal', label: 'Geothermal', renewable: true },
+  { id: 'other_renewable', label: 'Other renewable', renewable: true },
   { id: 'nuclear', label: 'Nuclear', renewable: false },
   { id: 'coal', label: 'Coal', renewable: false },
   { id: 'gas', label: 'Gas', renewable: false },
@@ -24,7 +26,8 @@ export const RENEWABLE_CATEGORIES = Object.freeze([
   'wind_offshore',
   'hydro',
   'biomass',
-  'geothermal'
+  'geothermal',
+  'other_renewable'
 ]);
 
 export function isRenewableCategory(value) {

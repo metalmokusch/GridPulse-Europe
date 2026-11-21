@@ -1300,7 +1300,7 @@ footer a {
 }
 .notice[hidden] { display: none; }
 .monitoring-panel[hidden] { display: none; }
-.quality-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 18px 24px 24px; }
+.quality-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 18px 24px 24px; }
 .quality-stats article { display: grid; gap: 6px; min-width: 0; }
 .quality-stats strong { font-size: 18px; overflow-wrap: anywhere; }
 .quality-stats span { color: var(--muted, #77808d); font-size: 12px; }
