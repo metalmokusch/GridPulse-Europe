@@ -7,15 +7,15 @@ import { getCategoryTaxonomy, TAXONOMY_VERSION } from './domain/categories.js';
 import { classifyFreshness } from './domain/freshness.js';
 import { fetchEntsoeGeneration } from './providers/entsoe/client.js';
 import { createQualityMonitor } from './monitoring/quality-monitor.js';
+import { ENTSOE_LIVE_COUNTRIES, getEntsoeCountry } from './providers/entsoe/countries.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
 const MIME_TYPES = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 const LIVE_MODE = process.env.GRIDPULSE_DATA_SOURCE === 'entsoe';
-const COUNTRY_CODES = new Set((LIVE_MODE ? ['HU'] : getCountries().map(({ code }) => code)));
-let liveCache;
-let liveCacheExpiresAt = 0;
-let liveFetch;
+const COUNTRY_CODES = new Set((LIVE_MODE ? ENTSOE_LIVE_COUNTRIES.map(({ code }) => code) : getCountries().map(({ code }) => code)));
+const liveCache = new Map();
+const liveFetches = new Map();
 const qualityMonitor = LIVE_MODE && process.env.GRIDPULSE_QUALITY_LOG_FILE
   ? createQualityMonitor({ filePath: process.env.GRIDPULSE_QUALITY_LOG_FILE })
   : null;
@@ -31,16 +31,19 @@ function liveSourceWithFreshness(mix) {
   return { ...mix, source: { ...mix.source, freshness } };
 }
 
-async function getLiveMix({ force = false } = {}) {
-  if (!force && liveCache && Date.now() < liveCacheExpiresAt) return liveCache;
-  if (liveFetch) return liveFetch;
-  liveFetch = fetchEntsoeGeneration({ countryCode: 'HU', sourceZone: '10YHU-MAVIR----U' });
+async function getLiveMix(country, { force = false } = {}) {
+  const cached = liveCache.get(country.code);
+  if (!force && cached && Date.now() < cached.expiresAt) return cached.mix;
+  const existingFetch = liveFetches.get(country.code);
+  if (existingFetch) return existingFetch;
+  const liveFetch = fetchEntsoeGeneration({ countryCode: country.code, countryName: country.name, sourceZone: country.sourceZone });
+  liveFetches.set(country.code, liveFetch);
   try {
-    liveCache = await liveFetch;
-    liveCacheExpiresAt = Date.now() + 5 * 60_000;
-    return liveCache;
+    const mix = await liveFetch;
+    liveCache.set(country.code, { mix, expiresAt: Date.now() + 5 * 60_000 });
+    return mix;
   } finally {
-    liveFetch = undefined;
+    liveFetches.delete(country.code);
   }
 }
 
@@ -74,7 +77,7 @@ export async function handleRequest(request, response) {
       return json(response, 200, { monitoring: qualityMonitor.summary() });
     }
     if (url.pathname === '/api/v1/countries') return json(response, 200, { countries: LIVE_MODE
-      ? [{ code: 'HU', name: 'Hungary', provider_zone_code: '10YHU-MAVIR----U', data_status: 'actual' }]
+      ? ENTSOE_LIVE_COUNTRIES.map(({ code, name, sourceZone }) => ({ code, name, provider_zone_code: sourceZone, data_status: 'actual' }))
       : getCountries() });
     if (url.pathname === '/api/v1/categories') return json(response, 200, { taxonomy_version: TAXONOMY_VERSION, categories: getCategoryTaxonomy() });
 
@@ -87,14 +90,13 @@ export async function handleRequest(request, response) {
       if (LIVE_MODE) {
         try {
           const force = url.searchParams.get('refresh') === 'true';
-          const rawMix = await getLiveMix({ force });
-          const mix = liveSourceWithFreshness(rawMix);
-          const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
-          return json(response, 200, { generated_at_utc: mix.generated_at_utc, data_status: 'actual', summary: [{
-            ...mix.country,
-            latest,
-            source: mix.source
-          }] });
+          const summary = await Promise.all(unique.map(async (code) => {
+            const country = getEntsoeCountry(code);
+            const mix = liveSourceWithFreshness(await getLiveMix(country, { force }));
+            const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
+            return { ...mix.country, latest, source: mix.source };
+          }));
+          return json(response, 200, { generated_at_utc: new Date().toISOString(), data_status: 'actual', summary });
         } catch {
           return json(response, 502, { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Live ENTSO-E data is temporarily unavailable.' } });
         }
@@ -105,12 +107,13 @@ export async function handleRequest(request, response) {
     const match = url.pathname.match(/^\/api\/v1\/countries\/([A-Z]{2})\/generation-mix(?:\/(latest))?$/);
     if (match) {
       const [, code, latest] = match;
-      if (LIVE_MODE && code !== 'HU') return json(response, 404, { error: { code: 'COUNTRY_NOT_FOUND', message: 'Live ENTSO-E mode currently supports Hungary only.' } });
+      const liveCountry = LIVE_MODE ? getEntsoeCountry(code) : null;
+      if (LIVE_MODE && !liveCountry) return json(response, 404, { error: { code: 'COUNTRY_NOT_FOUND', message: 'No live ENTSO-E bidding zone is configured for this country.' } });
       let series;
       if (LIVE_MODE) {
         try {
           const force = url.searchParams.get('refresh') === 'true';
-          const rawMix = await getLiveMix({ force });
+          const rawMix = await getLiveMix(liveCountry, { force });
           series = liveSourceWithFreshness(rawMix);
         } catch {
           return json(response, 502, { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Live ENTSO-E data is temporarily unavailable.' } });
@@ -136,7 +139,7 @@ export function createAppServer() {
   if (qualityMonitor) {
     const check = async () => {
       try {
-        qualityMonitor.recordSuccess(await getLiveMix({ force: true }));
+        qualityMonitor.recordSuccess(await getLiveMix(getEntsoeCountry('HU'), { force: true }));
       } catch (error) {
         qualityMonitor.recordFailure(error?.qualityCode);
       }

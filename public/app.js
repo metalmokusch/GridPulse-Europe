@@ -23,11 +23,12 @@ function fmtNumber(value) { return new Intl.NumberFormat('en-GB', { maximumFract
 function fmtTime(value) { return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }).format(new Date(value)); }
 function fmtDate(value) { return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }).format(new Date(value)); }
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+function flagEmoji(code) { return String.fromCodePoint(...code.toUpperCase().split('').map((char) => 127397 + char.charCodeAt(0))); }
 
 function renderPicker() {
   $('#country-picker').innerHTML = state.countries.map((country) => {
     const checked = state.selected.includes(country.code);
-    return `<label class="country-chip ${checked ? 'selected' : ''}"><input type="checkbox" value="${country.code}" ${checked ? 'checked' : ''}><span class="flag flag-${country.code.toLowerCase()}" aria-hidden="true"></span><span>${escapeHtml(country.name)}</span><span class="chip-code">${country.code}</span></label>`;
+    return `<label class="country-chip ${checked ? 'selected' : ''}"><input type="checkbox" value="${country.code}" ${checked ? 'checked' : ''}><span class="flag-emoji" aria-hidden="true">${flagEmoji(country.code)}</span><span>${escapeHtml(country.name)}</span><span class="chip-code">${country.code}</span></label>`;
   }).join('');
   $('#country-picker').querySelectorAll('input').forEach((input) => input.addEventListener('change', onCountryChange));
 }
@@ -104,14 +105,16 @@ function showToast(message) {
 
 function renderKpis(summary) {
   const total = summary.reduce((sum, item) => sum + item.latest.total_mw, 0);
-  const coverageComplete = summary.every((item) => item.latest.coverage_complete !== false && item.latest.renewable_share_pct !== null);
-  const weightedRenewables = coverageComplete && total ? summary.reduce((sum, item) => sum + item.latest.total_mw * item.latest.renewable_share_pct / 100, 0) / total * 100 : null;
+  const knownShares = summary.filter((item) => item.latest.renewable_share_pct !== null && item.latest.total_mw > 0);
+  const coverageComplete = summary.every((item) => item.latest.coverage_complete !== false);
+  const weightedDenominator = knownShares.reduce((sum, item) => sum + item.latest.total_mw, 0);
+  const weightedRenewables = weightedDenominator ? knownShares.reduce((sum, item) => sum + item.latest.total_mw * item.latest.renewable_share_pct / 100, 0) / weightedDenominator * 100 : null;
   const latest = summary.reduce((value, item) => item.latest.period_end_utc > value ? item.latest.period_end_utc : value, summary[0].latest.period_end_utc);
   const leading = [...summary].sort((a, b) => b.latest.renewable_share_pct - a.latest.renewable_share_pct)[0];
   $('#kpis').innerHTML = `
     <article class="kpi-card"><div class="kpi-top"><span>${coverageComplete ? 'COMBINED GENERATION' : 'OBSERVED GENERATION'}</span><span class="kpi-icon mint" aria-hidden="true">↗</span></div><strong>${fmtNumber(total)} <small>MW</small></strong><div class="kpi-detail">${coverageComplete ? 'Complete category coverage' : 'Reported categories only · coverage incomplete'}</div></article>
-    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE SHARE</span><span class="kpi-icon blue" aria-hidden="true">◌</span></div><strong>${weightedRenewables === null ? '—' : `${weightedRenewables.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? 'All sources · weighted by generation' : 'Unavailable until category coverage is confirmed'}</div></article>
-    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE MIX</span><span class="kpi-icon gold" aria-hidden="true">✳</span></div><strong>${leading.latest.renewable_share_pct === null ? '—' : `${leading.latest.renewable_share_pct.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? `${escapeHtml(leading.name)} (${leading.code})` : 'Unavailable · incomplete coverage'}</div></article>
+    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE SHARE</span><span class="kpi-icon blue" aria-hidden="true">◌</span></div><strong>${weightedRenewables === null ? '—' : `${weightedRenewables.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? 'All sources · weighted by generation' : 'Reported categories only · unknown stays unclassified'}</div></article>
+    <article class="kpi-card"><div class="kpi-top"><span>RENEWABLE MIX</span><span class="kpi-icon gold" aria-hidden="true">✳</span></div><strong>${leading.latest.renewable_share_pct === null ? '—' : `${leading.latest.renewable_share_pct.toFixed(1)}<small>%</small>`}</strong><div class="kpi-detail">${coverageComplete ? `${escapeHtml(leading.name)} (${leading.code})` : `${escapeHtml(leading.name)} · reported categories only`}</div></article>
     <article class="kpi-card"><div class="kpi-top"><span>DATA PERIOD ENDS</span><span class="kpi-icon violet" aria-hidden="true">◷</span></div><strong class="time-value">${fmtTime(latest)}</strong><div class="kpi-detail">${fmtDate(latest)} · UTC</div></article>`;
 }
 
@@ -170,9 +173,9 @@ function renderComparison(summary) {
   const max = Math.max(1, ...summary.map((item) => item.latest.total_mw));
   $('#comparison-list').innerHTML = summary.map((item) => {
     const share = item.latest.renewable_share_pct;
-    const shareLabel = share === null ? 'Renewable share unavailable' : `${share.toFixed(1)}% renewable`;
+    const shareLabel = share === null ? 'Renewable share unavailable' : `${share.toFixed(1)}% renewable${item.latest.coverage_complete === false ? ' · reported only' : ''}`;
     const progressWidth = share === null ? 0 : Math.max(0, Math.min(100, share));
-    return `<article class="comparison-item"><div class="comparison-top"><div class="comparison-country"><span class="flag flag-${item.code.toLowerCase()}" aria-hidden="true"></span><strong>${escapeHtml(item.name)}</strong><span class="chip-code">${item.code}</span></div><span class="comparison-time">${fmtTime(item.latest.period_end_utc)}</span></div><div class="comparison-metrics"><strong>${fmtNumber(item.latest.total_mw)} <small>MW</small></strong><span>${shareLabel}</span></div><div class="progress-track" role="img" aria-label="${shareLabel}"><span style="width:${progressWidth}%"></span></div><div class="comparison-foot"><span>${item.latest.coverage_complete === false ? 'Reported categories' : 'Generation'}</span><span>${(item.latest.total_mw / max * 100).toFixed(0)}% of selected peak</span></div></article>`;
+    return `<article class="comparison-item"><div class="comparison-top"><div class="comparison-country"><span class="flag-emoji" aria-hidden="true">${flagEmoji(item.code)}</span><strong>${escapeHtml(item.name)}</strong><span class="chip-code">${item.code}</span></div><span class="comparison-time">${fmtTime(item.latest.period_end_utc)}</span></div><div class="comparison-metrics"><strong>${fmtNumber(item.latest.total_mw)} <small>MW</small></strong><span>${shareLabel}</span></div><div class="progress-track" role="img" aria-label="${shareLabel}"><span style="width:${progressWidth}%"></span></div><div class="comparison-foot"><span>${item.latest.coverage_complete === false ? 'Reported categories' : 'Generation'}</span><span>${(item.latest.total_mw / max * 100).toFixed(0)}% of selected peak</span></div></article>`;
   }).join('');
 }
 

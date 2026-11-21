@@ -83,7 +83,7 @@ This fixture-only release does not write application data and has no database vo
 - `GET /api/v1/countries/{code}/generation-mix`
 - `GET /api/v1/countries/{code}/generation-mix/latest`
 
-All demo observations use MW and UTC periods and are explicitly marked `synthetic`. The versioned taxonomy is exposed at `/api/v1/categories`. Renewable share is solar, wind, hydro, biomass, and geothermal divided by total generation; nuclear is excluded. A share is omitted if coverage is incomplete or unknown source data contributes a non-zero amount.
+All demo observations use MW and UTC periods and are explicitly marked `synthetic`. The versioned taxonomy is exposed at `/api/v1/categories`. In live mode, renewable share is calculated over the categories actually reported: only explicitly mapped renewable sources enter the numerator; unknown and unclassified categories stay in the denominator and never count as renewable. Missing intervals remain blank. The dashboard labels this as reported categories only while coverage remains incomplete.
 
 ## Project decisions and next steps
 
@@ -97,4 +97,4 @@ All demo observations use MW and UTC periods and are explicitly marked `syntheti
 - [Private live quality monitoring](docs/adr/0006-private-quality-monitoring.md)
 - [Initial technical direction](docs/adr/0001-initial-technical-direction.md)
 
-An isolated ENTSO-E parser and normalizer support an opt-in, private HU live mode. The dashboard remains synthetic by default. Public redistribution is not enabled; ENTSO-E attribution and primary-owner rights requirements still apply. See the project plan and source notes for current details.
+An opt-in, private ENTSO-E live mode supports 20 single-bidding-zone countries in [`countries.js`](src/providers/entsoe/countries.js), including HU, AT, and the combined DE-LU zone. A short metadata-only live request returned data for all 20; some are hourly, retained as hourly without inventing quarter-hour readings. The dashboard remains synthetic by default. Public redistribution is not enabled; ENTSO-E attribution and primary-owner rights requirements still apply. See the project plan and source notes for current details.

@@ -460,11 +460,10 @@ main {
   box-shadow: inset 0 0 0 2px #18312b
 }
 
-.flag {
+.flag-emoji {
   width: 15px;
-  height: 10px;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px #fff2;
+  font-size: 12px;
+  line-height: 1;
   display: inline-block;
   flex: none
 }

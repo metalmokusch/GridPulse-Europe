@@ -60,6 +60,9 @@ test('live client uses the local token, requests a 24-hour window, caches no val
     assert.equal(result.observations[1].total_mw, null);
     assert.deepEqual(result.observations.at(-1).values.map(({ value }) => value), [84]);
     assert.equal(result.observations[0].coverage_complete, false);
+    assert.equal(result.observations[0].renewable_share_pct, 100);
+    assert.equal(result.observations[0].values[0].renewable, true);
+    assert.ok(result.observations[0].quality_flags.includes('unknown_categories_excluded_from_renewable_numerator'));
     assert.equal(result.source.provider, 'entsoe');
     assert.equal(JSON.stringify(result).includes('test-secret-token'), false);
   } finally {
@@ -72,8 +75,41 @@ test('live client uses the local token, requests a 24-hour window, caches no val
   }
 });
 
-test('live client refuses unvalidated zones before making a request', async () => {
-  await assert.rejects(fetchEntsoeGeneration({ countryCode: 'AT', sourceZone: '10YAT-APG------L' }), /only the validated HU/);
+test('live client requires a country code and bidding zone', async () => {
+  await assert.rejects(fetchEntsoeGeneration({ countryCode: 'AT' }), /country and bidding zone are required/);
+});
+
+test('unclassified waste remains in reported denominator but not renewable numerator', async () => {
+  await withClientEnvironment({ fetchImpl: async (url) => {
+    const start = '2026-11-20T17:00Z';
+    return { ok: true, status: 200, text: async () => `<Publication_MarketDocument>
+      <TimeSeries><MktPSRType><psrType>B16</psrType></MktPSRType><Period><start>${start}</start><resolution>PT15M</resolution><Point><position>96</position><quantity>20</quantity></Point></Period></TimeSeries>
+      <TimeSeries><MktPSRType><psrType>B17</psrType></MktPSRType><Period><start>${start}</start><resolution>PT15M</resolution><Point><position>96</position><quantity>80</quantity></Point></Period></TimeSeries>
+    </Publication_MarketDocument>` };
+  } }, async () => {
+    const result = await fetchEntsoeGeneration({ countryCode: 'HU', sourceZone: '10YHU-MAVIR----U', now: new Date('2026-11-21T17:20:00.000Z') });
+    const last = result.observations.at(-1);
+    assert.equal(last.total_mw, 100);
+    assert.equal(last.renewable_share_pct, 20);
+    assert.equal(last.values.find(({ source_category }) => source_category === 'B17').renewable, false);
+  });
+});
+
+test('live client retains hourly observations without manufacturing quarter-hour values', async () => {
+  await withClientEnvironment({ fetchImpl: async () => ({
+    ok: true,
+    status: 200,
+    text: async () => `<Publication_MarketDocument><TimeSeries>
+      <MktPSRType><psrType>B16</psrType></MktPSRType><Period><start>2026-11-20T17:00Z</start><resolution>PT60M</resolution><Point><position>24</position><quantity>84</quantity></Point></Period>
+    </TimeSeries></Publication_MarketDocument>`
+  }) }, async () => {
+    const result = await fetchEntsoeGeneration({ countryCode: 'BE', sourceZone: '10YBE----------2', now: new Date('2026-11-21T17:20:00.000Z') });
+    assert.equal(result.observations.length, 24);
+    assert.equal(result.observations.slice(0, -1).filter(({ values }) => values.length).length, 0);
+    assert.equal(result.observations.at(-1).values[0].value, 84);
+    assert.equal(result.observations.at(-1).renewable_share_pct, 100);
+    assert.equal(Date.parse(result.observations.at(-1).period_end_utc) - Date.parse(result.observations.at(-1).period_start_utc), 60 * 60_000);
+  });
 });
 
 test('live client classifies HTTP failures without retaining provider response text', async () => {

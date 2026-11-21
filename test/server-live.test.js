@@ -23,7 +23,7 @@ function asEntsoeTimestamp(parameter) {
   return `${parameter.slice(0, 4)}-${parameter.slice(4, 6)}-${parameter.slice(6, 8)}T${parameter.slice(8, 10)}:${parameter.slice(10, 12)}Z`;
 }
 
-test('private live routes expose HU, compute freshness, cache requests, and force refresh on demand', async () => {
+test('private live routes expose configured countries, compute renewable share, cache requests, and force refresh on demand', async () => {
   const oldFetch = globalThis.fetch;
   const oldToken = process.env.ENTSOE_API_TOKEN;
   process.env.ENTSOE_API_TOKEN = 'test-only-token';
@@ -52,9 +52,12 @@ test('private live routes expose HU, compute freshness, cache requests, and forc
       request('/api/v1/countries/HU/generation-mix')
     ]);
     assert.deepEqual(ready.json, { status: 'ready', persistence: 'none', provider: 'entsoe' });
-    assert.deepEqual(countries.json.countries.map(({ code }) => code), ['HU']);
+    assert.ok(countries.json.countries.some(({ code }) => code === 'HU'));
+    assert.ok(countries.json.countries.some(({ code }) => code === 'AT'));
+    assert.ok(countries.json.countries.some(({ code }) => code === 'DE'));
     assert.equal(summary.status, 200);
-    assert.equal(summary.json.summary[0].latest.renewable_share_pct, null);
+    assert.equal(summary.json.summary[0].latest.renewable_share_pct, 100);
+    assert.equal(summary.json.summary[0].latest.coverage_complete, false);
     assert.equal(summary.json.summary[0].source.freshness.status, 'fresh');
     assert.equal(series.json.observations.length, 96);
     assert.equal(series.json.observations[94].values.length, 0);
@@ -63,7 +66,7 @@ test('private live routes expose HU, compute freshness, cache requests, and forc
 
     await request('/api/v1/dashboard/summary?countries=HU&refresh=true');
     assert.equal(fetchCount, 2, 'manual refresh must bypass the memory cache');
-    const unsupported = await request('/api/v1/dashboard/summary?countries=AT');
+    const unsupported = await request('/api/v1/dashboard/summary?countries=ZZ');
     assert.equal(unsupported.status, 400);
   } finally {
     globalThis.fetch = oldFetch;

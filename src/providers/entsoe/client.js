@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { normalizeEntsoeGeneration } from './normalize-generation.js';
 import { parseEntsoeResponse } from './parse-response.js';
 import { ENTSOE_PSR_TYPES } from './psr-types.js';
+import { isRenewableCategory, getCategoryTaxonomy } from '../../domain/categories.js';
 
 const API_URL = 'https://web-api.tp.entsoe.eu/api';
 
@@ -27,9 +28,9 @@ function periodParameter(date) {
   return date.toISOString().slice(0, 16).replace(/[-:T]/g, '');
 }
 
-export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new Date() }) {
-  if (countryCode !== 'HU' || sourceZone !== '10YHU-MAVIR----U') {
-    throw providerError('UNSUPPORTED_ZONE', 'Live ENTSO-E mode currently supports only the validated HU bidding zone.');
+export async function fetchEntsoeGeneration({ countryCode, countryName, sourceZone, now = new Date() }) {
+  if (!/^[A-Z]{2}$/.test(countryCode ?? '') || !sourceZone) {
+    throw providerError('UNSUPPORTED_ZONE', 'A supported country and bidding zone are required.');
   }
 
   const periodEnd = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000);
@@ -74,9 +75,11 @@ export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new
   } catch {
     throw providerError('INVALID_RESPONSE', 'ENTSO-E response could not be normalized.');
   }
-  if (normalized.observations.some(({ period_start_utc, period_end_utc }) => Date.parse(period_end_utc) - Date.parse(period_start_utc) !== 15 * 60_000)) {
+  const resolutions = new Set(normalized.observations.map(({ period_start_utc, period_end_utc }) => Date.parse(period_end_utc) - Date.parse(period_start_utc)));
+  if (resolutions.size !== 1 || ![15 * 60_000, 60 * 60_000].includes([...resolutions][0])) {
     throw providerError('UNSUPPORTED_RESOLUTION', 'ENTSO-E returned an unvalidated resolution.');
   }
+  const intervalMs = [...resolutions][0];
 
   const byPeriod = new Map();
   for (const observation of normalized.observations) {
@@ -103,17 +106,25 @@ export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new
       source_category: observation.source_category,
       label: ENTSOE_PSR_TYPES[observation.source_category] ?? `Unknown (${observation.source_category})`,
       color: null,
-      renewable: false,
+      renewable: isRenewableCategory(observation.normalized_category),
       value: observation.value,
       quality_flags: observation.quality_flags
     });
     byPeriod.set(key, point);
   }
 
+  for (const point of byPeriod.values()) {
+    const renewableMw = point.values.filter(({ renewable }) => renewable).reduce((sum, item) => sum + item.value, 0);
+    point.renewable_share_pct = point.total_mw > 0 ? Number((renewableMw / point.total_mw * 100).toFixed(1)) : null;
+    point.quality_flags.push('renewable_share_reported_categories_only', 'unknown_categories_excluded_from_renewable_numerator');
+  }
+  const categoryLabels = new Map(getCategoryTaxonomy().map(({ id, label }) => [id, label]));
+  for (const point of byPeriod.values()) {
+    for (const item of point.values) item.label = categoryLabels.get(item.category) ?? item.label;
+  }
   const observed = [...byPeriod.values()].sort((a, b) => a.period_end_utc.localeCompare(b.period_end_utc));
   if (!observed.length) throw providerError('EMPTY_RESPONSE', 'ENTSO-E returned no observations for the requested period.');
-  const intervalMs = 15 * 60_000;
-  const observations = Array.from({ length: 96 }, (_, index) => {
+  const observations = Array.from({ length: 24 * 60 * 60_000 / intervalMs }, (_, index) => {
     const start = new Date(periodStart.getTime() + index * intervalMs);
     const end = new Date(start.getTime() + intervalMs);
     return byPeriod.get(end.toISOString()) ?? {
@@ -134,7 +145,7 @@ export async function fetchEntsoeGeneration({ countryCode, sourceZone, now = new
     };
   });
   return {
-    country: { code: countryCode, name: 'Hungary', provider_zone_code: sourceZone },
+    country: { code: countryCode, name: countryName ?? countryCode, provider_zone_code: sourceZone },
     generated_at_utc: now.toISOString(),
     source: {
       provider: 'entsoe',

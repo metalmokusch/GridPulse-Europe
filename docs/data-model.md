@@ -32,7 +32,9 @@ Pumped hydro storage is kept separate from renewable hydro and excluded from ren
 
 ## Mix summary policy
 
-`summarizeGenerationMix` rejects observations from different providers, datasets, zones, time periods, units, or data statuses. It sums the supplied values as the total and renewable amounts. It returns a percentage only when the caller explicitly attests `coverage_complete: true`, no unknown-category amount is present, and the total is non-zero. Otherwise the percentage is `null` with a reason (`incomplete_coverage`, `unknown_categories`, or `zero_total`).
+`summarizeGenerationMix` rejects observations from different providers, datasets, zones, time periods, units, or data statuses. It sums the supplied values as the total and renewable amounts. Its strict analytical percentage is returned only when the caller explicitly attests `coverage_complete: true`, no unknown-category amount is present, and the total is non-zero. Otherwise that function returns `null` with a reason (`incomplete_coverage`, `unknown_categories`, or `zero_total`).
+
+The private ENTSO-E live adapter separately reports an explicitly labeled *reported-category share*: renewable mapped values divided by the sum of values actually returned for the same interval. It never fills missing intervals with zero. Unknown and known-unclassified categories remain in that reported denominator but never enter the renewable numerator. `coverage_complete` stays false, and the dashboard labels the percentage “reported categories only.” This is a partial observed mix metric, not an attestation of full-system renewable share.
 
 `coverage_complete` must only be true when the provider response is known to include all categories required for the denominator. The system must not infer completeness from a convenient sum or from absent categories. Until the ENTSO-E response contract and category semantics are validated, this rule is exercised only with the complete synthetic demo fixture.
 

@@ -13,7 +13,7 @@ The dashboard needs consistent UTC periods, units, zone identifiers, source cate
 - Preserve the provider's category string and use the explicit normalized `unknown` category if no reviewed mapping exists.
 - Version the domain taxonomy as `1.2.0`; renewable categories include `other_renewable` alongside solar, wind onshore/offshore, hydro, biomass, and geothermal. Pumped hydro storage is separate and excluded from renewable share; ENTSO-E B10 may carry negative values while pumping. Nuclear is excluded.
 - Values must be finite; negative values are accepted only for the normalized `hydro_pumped_storage` category.
-- Require a caller-supplied completeness attestation before publishing a renewable percentage. Return `null` if coverage is incomplete, a non-zero unknown amount exists, or the denominator is zero.
+- Keep `summarizeGenerationMix` strict: require a caller-supplied completeness attestation, and return `null` if coverage is incomplete, a non-zero unknown amount exists, or the denominator is zero. The private live adapter may additionally expose a separately labeled reported-category share: unknown/unclassified generation remains in the reported denominator but is excluded from the renewable numerator; missing periods remain blank and coverage remains explicitly incomplete.
 - Require a mix to contain only one provider, dataset, zone, period, unit, and data status.
 - Use the validator and calculation only with synthetic data until the provider contract and reuse rights are approved.
 
