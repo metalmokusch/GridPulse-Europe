@@ -36,7 +36,7 @@ Pumped hydro storage is kept separate from renewable hydro and excluded from ren
 
 The private ENTSO-E live adapter separately reports an explicitly labeled *reported-category share*: renewable mapped values divided by the sum of values actually returned for the same interval. It never fills missing intervals with zero. Unknown and known-unclassified categories remain in that reported denominator but never enter the renewable numerator. `coverage_complete` stays false, and the dashboard labels the percentage “reported categories only.” This is a partial observed mix metric, not an attestation of full-system renewable share.
 
-`coverage_complete` must only be true when the provider response is known to include all categories required for the denominator. The system must not infer completeness from a convenient sum or from absent categories. Until the ENTSO-E response contract and category semantics are validated, this rule is exercised only with the complete synthetic demo fixture.
+`coverage_complete` must only be true when the provider response is known to include all categories required for the denominator. The system must not infer completeness from a convenient sum or from absent categories. ENTSO-E live records therefore continue to carry `coverage_complete: false`; only the explicitly partial reported-category metric is available until category coverage can be attested.
 
 ## Validation
 

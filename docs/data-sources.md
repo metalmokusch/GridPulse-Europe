@@ -82,7 +82,7 @@ References: [Terms and Conditions](https://transparencyplatform.zendesk.com/hc/e
 ## Next source-validation steps
 
 1. The project owner stores the token locally. Never paste the token into chat, issues, screenshots, source files, or logs.
-2. The owner can use the opt-in local HU mode for private analysis, subject to the existing terms, attribution, and no-redistribution guardrails.
+2. The owner can use the opt-in local multi-zone live mode for private analysis, subject to the existing terms, attribution, and no-redistribution guardrails.
 3. Verify sparse B05/B06/B09 behavior over additional windows; treat the heuristic as a review signal, not evidence of missing production. Keep response values out of the repository.
 4. Review failure classifications from subsequent checks after deploying the local hardening; existing historical `failure` records contain no cause and cannot be diagnosed retroactively.
 5. Review mature vs pending interval counts in future quality records; the monitor now excludes the latest H+1 publication window from its mature-coverage metric while retaining raw 24-hour counts.

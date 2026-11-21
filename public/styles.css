@@ -974,6 +974,16 @@ footer a {
   color: #ebc3bc
 }
 
+.partial-error {
+  margin-bottom: 12px;
+  padding: 10px 13px;
+  border: 1px solid #72543d;
+  border-radius: 7px;
+  background: #251f19;
+  color: #e8c99e;
+  font-size: 11px
+}
+
 .error-state span {
   color: #c2948e;
   font-size: 11px

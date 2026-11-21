@@ -74,7 +74,7 @@ export async function handleRequest(request, response) {
     if (url.pathname === '/health/ready') return json(response, 200, { status: 'ready', persistence: LIVE_MODE ? 'none' : 'fixture', provider: LIVE_MODE ? 'entsoe' : 'synthetic-demo' });
     if (url.pathname === '/api/v1/monitoring/quality') {
       if (!LIVE_MODE || !qualityMonitor) return json(response, 404, { error: { code: 'NOT_AVAILABLE', message: 'Quality monitoring is not enabled.' } });
-      return json(response, 200, { monitoring: qualityMonitor.summary() });
+      return json(response, 200, { monitoring: { country_code: 'HU', ...qualityMonitor.summary() } });
     }
     if (url.pathname === '/api/v1/countries') return json(response, 200, { countries: LIVE_MODE
       ? ENTSOE_LIVE_COUNTRIES.map(({ code, name, sourceZone }) => ({ code, name, provider_zone_code: sourceZone, data_status: 'actual' }))
@@ -88,18 +88,22 @@ export async function handleRequest(request, response) {
         return json(response, 400, { error: { code: 'INVALID_COUNTRIES', message: 'Select one to three supported countries.' } });
       }
       if (LIVE_MODE) {
-        try {
-          const force = url.searchParams.get('refresh') === 'true';
-          const summary = await Promise.all(unique.map(async (code) => {
-            const country = getEntsoeCountry(code);
+        const force = url.searchParams.get('refresh') === 'true';
+        const results = await Promise.all(unique.map(async (code) => {
+          const country = getEntsoeCountry(code);
+          try {
             const mix = liveSourceWithFreshness(await getLiveMix(country, { force }));
             const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
-            return { ...mix.country, latest, source: mix.source };
-          }));
-          return json(response, 200, { generated_at_utc: new Date().toISOString(), data_status: 'actual', summary });
-        } catch {
-          return json(response, 502, { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Live ENTSO-E data is temporarily unavailable.' } });
-        }
+            if (!latest) return { error: { country_code: code, code: 'EMPTY_RESPONSE' } };
+            return { item: { ...mix.country, latest, source: mix.source } };
+          } catch (error) {
+            return { error: { country_code: code, code: error?.qualityCode ?? 'PROVIDER_UNAVAILABLE' } };
+          }
+        }));
+        const summary = results.flatMap(({ item }) => item ? [item] : []);
+        const errors = results.flatMap(({ error }) => error ? [error] : []);
+        if (!summary.length) return json(response, 502, { error: { code: 'PROVIDER_UNAVAILABLE', message: 'Live ENTSO-E data is temporarily unavailable.' }, errors });
+        return json(response, 200, { generated_at_utc: new Date().toISOString(), data_status: 'actual', partial: errors.length > 0, summary, errors });
       }
       return json(response, 200, { generated_at_utc: new Date().toISOString(), data_status: 'synthetic', summary: getSummary(unique) });
     }

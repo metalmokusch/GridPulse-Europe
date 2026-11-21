@@ -28,7 +28,7 @@ test('private live routes expose configured countries, compute renewable share, 
   const oldToken = process.env.ENTSOE_API_TOKEN;
   process.env.ENTSOE_API_TOKEN = 'test-only-token';
   let fetchCount = 0;
-  globalThis.fetch = async (url) => {
+  const successfulFetch = async (url) => {
     fetchCount += 1;
     const params = new URL(url).searchParams;
     return {
@@ -43,6 +43,7 @@ test('private live routes expose configured countries, compute renewable share, 
         </Period></TimeSeries></Publication_MarketDocument>`
     };
   };
+  globalThis.fetch = successfulFetch;
 
   try {
     const [ready, countries, summary, series] = await Promise.all([
@@ -68,6 +69,20 @@ test('private live routes expose configured countries, compute renewable share, 
     assert.equal(fetchCount, 2, 'manual refresh must bypass the memory cache');
     const unsupported = await request('/api/v1/dashboard/summary?countries=ZZ');
     assert.equal(unsupported.status, 400);
+
+    globalThis.fetch = async (url) => {
+      if (new URL(url).searchParams.get('in_Domain') === '10YAT-APG------L') {
+        fetchCount += 1;
+        return { ok: false, status: 503, text: async () => 'private provider response detail' };
+      }
+      return successfulFetch(url);
+    };
+    const partial = await request('/api/v1/dashboard/summary?countries=HU,AT&refresh=true');
+    assert.equal(partial.status, 200);
+    assert.equal(partial.json.partial, true);
+    assert.deepEqual(partial.json.summary.map(({ code }) => code), ['HU']);
+    assert.deepEqual(partial.json.errors, [{ country_code: 'AT', code: 'HTTP_503' }]);
+    assert.equal(JSON.stringify(partial.json).includes('private provider response detail'), false);
   } finally {
     globalThis.fetch = oldFetch;
     if (oldToken === undefined) delete process.env.ENTSOE_API_TOKEN;

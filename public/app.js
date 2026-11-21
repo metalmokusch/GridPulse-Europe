@@ -7,7 +7,7 @@ const COLORS = {
   nuclear: '#a991ed', gas: '#f17d77', coal: '#9ca8b5', oil: '#796b62',
   other_fossil: '#b77c69', other: '#788697', unknown: '#657386'
 };
-const state = { countries: [], selected: ['HU'], selectedCategories: Object.keys(COLORS), periodHours: 24, timer: null, refreshInterval: null };
+const state = { countries: [], selected: ['HU'], selectedCategories: Object.keys(COLORS), periodHours: 24, timer: null, refreshInterval: null, countryErrors: [] };
 const $ = (selector) => document.querySelector(selector);
 
 async function request(path) {
@@ -201,8 +201,9 @@ function renderTable(summary) {
   const freshnessLabels = { fresh: 'Fresh', delayed: 'Delayed', stale: 'Stale', no_data: 'No data', unknown: 'Unknown age' };
   const freshnessLabel = freshnessLabels[source.freshness?.status] ?? 'Unknown age';
   $('#demo-pill').innerHTML = live ? `<span></span>ENTSO-E · ${freshnessLabel.toUpperCase()}` : '<span></span>DEMO DATA';
+  $('#app-mode').textContent = live ? 'LIVE · PRIVATE' : 'DEMO · SYNTHETIC';
   $('#system-title').textContent = live ? `ENTSO-E · ${freshnessLabel}` : 'Demo environment';
-  $('#system-subtitle').textContent = live ? 'HU · latest period age' : 'No provider connected';
+  $('#system-subtitle').textContent = live ? `${summary.map(({ code }) => code).join(', ')} · latest period age` : 'No provider connected';
   $('#chart-footnote').textContent = live ? 'Reported observations · gaps remain blank' : 'Synthetic hourly samples';
 }
 
@@ -217,18 +218,34 @@ function renderError(message) {
 async function loadDashboard({ force = false } = {}) {
   $('#dashboard-content').setAttribute('aria-busy', 'true');
   try {
-    const countries = encodeURIComponent(state.selected.join(','));
-    const refreshParam = force ? '&refresh=true' : '';
-    const [summaryResult, ...series] = await Promise.all([
-      request(`/api/v1/dashboard/summary?countries=${countries}${refreshParam}`),
-      ...state.selected.map((code) => request(`/api/v1/countries/${code}/generation-mix${force ? '?refresh=true' : ''}`))
-    ]);
-    state.latestSummary = summaryResult.summary;
+    const results = await Promise.allSettled(state.selected.map((code) =>
+      request(`/api/v1/countries/${code}/generation-mix${force ? '?refresh=true' : ''}`)));
+    const series = [];
+    const summary = [];
+    state.countryErrors = [];
+    results.forEach((result, index) => {
+      const code = state.selected[index];
+      const country = state.countries.find((item) => item.code === code);
+      if (result.status === 'rejected') {
+        state.countryErrors.push(`${country?.name ?? code}: ${result.reason?.message ?? 'data unavailable'}`);
+        return;
+      }
+      const mix = result.value;
+      const latest = [...mix.observations].reverse().find(({ values }) => values.length > 0);
+      if (!latest) {
+        state.countryErrors.push(`${country?.name ?? code}: no generation points were reported`);
+        return;
+      }
+      series.push(mix);
+      summary.push({ ...mix.country, latest, source: mix.source });
+    });
+    if (!series.length) throw new Error(state.countryErrors.join('; ') || 'No selected country returned generation data.');
+    state.latestSummary = summary;
     state.latestSeries = series;
     state.selectedCategoriesCatalog = [...new Map(series.flatMap(({ observations }) => observations.flatMap(({ values }) => values))
       .map(({ category, label }) => [category, { id: category, label: category === 'unknown' ? 'Unclassified sources' : label }])).values()];
     renderCurrentDashboard();
-    if (summaryResult.summary[0]?.source.provider === 'entsoe' && !state.refreshInterval) {
+    if (state.latestSummary[0]?.source.provider === 'entsoe' && !state.refreshInterval) {
       state.refreshInterval = setInterval(() => loadDashboard({ force: true }), 15 * 60_000);
     }
   } catch (error) {
@@ -277,6 +294,11 @@ async function loadQualityMonitor() {
 
 function renderCurrentDashboard() {
   if (!state.latestSummary || !state.latestSeries) return;
+  const partialNotice = $('#country-load-errors');
+  partialNotice.hidden = state.countryErrors.length === 0;
+  partialNotice.textContent = state.countryErrors.length
+    ? `Some selected countries could not be loaded: ${state.countryErrors.join(' · ')}. Showing available countries.`
+    : '';
   renderKpis(state.latestSummary);
   renderChart(state.latestSeries);
   renderComparison(state.latestSummary);

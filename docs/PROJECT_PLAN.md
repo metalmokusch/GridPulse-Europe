@@ -2,7 +2,7 @@
 
 ## Product overview
 
-GridPulse Europe is a public, self-hosted analytics application for recent electricity generation by source across a pilot set of European countries/zones. It must show when an observation refers to, when it was fetched, its source, unit, and quality/freshness. Missing or stale data must remain explicit. The deployed application has no AI/model dependency.
+GridPulse Europe is a self-hosted analytics application for recent electricity generation by source across a pilot set of European countries/zones. V1 targets a private trusted-LAN OMV instance, supports the 20 validated single zones, compares up to three countries, and does not persist source observations. It must show period, fetch time, source, unit, and quality/freshness. Missing or stale data must remain explicit. The deployed application has no AI/model dependency.
 
 ## Implementation plan
 
@@ -11,13 +11,13 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 3. **Bootstrap demo-first vertical slice:** complete. API health/readiness, synthetic fixture data, and a responsive dashboard with explicit time/unit/status and tabular fallback run without external credentials.
 4. **Build data contracts and persistence:** provider-neutral UTC observation validation, versioned taxonomy, safe renewable-share calculation, and configurable freshness classifier are implemented and covered by offline tests. Country/zone distinction is preserved. A single-instance SQLite persistence boundary is the provisional direction; package choice, migrations, adapter-owned category maps, and idempotent storage remain open (see ADR 0004).
 5. **Add provider adapter:** access and HU query behavior are validated. Private live mode is opt-in, server-side, and non-persistent. A configured EIC list exposes 20 verified-in-sample single bidding zones; Germany uses DE-LU and must be described as a combined zone. The adapter preserves either PT15M or PT60M periods and rejects mixed/unsupported resolutions. Wider exposure still requires written reuse clarification.
-6. **Complete analytics and operations:** the responsive dashboard, Compose deployment, and initial OMV validation are complete. Multi-day live-feed monitoring is underway. Historical analytics, persistence of source observations, backup/restore, and broader security review remain open.
+6. **Complete analytics and operations:** the responsive dashboard, Compose deployment, independent per-country failure display, and initial OMV validation are complete. HU-only multi-day feed monitoring is underway. Historical analytics, persistence of source observations, backup/restore, authentication, public exposure, and broader security review are outside the private-LAN V1 scope.
 
 ## Current state
 
 - Standalone local Git repository connected to the public `metalmokusch/GridPulse-Europe` repository.
 - First demo vertical slice implemented with native Node.js ESM, built-in HTTP, static HTML/CSS/JavaScript, synthetic HU/AT/DE fixtures, health/data endpoints, responsive dashboard, SVG chart, comparison cards, and table alternative.
-- Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs remain based on all sources.
+- Dashboard controls support 6/12/24-hour chart windows and source-category filtering for the SVG chart and latest-value table. Country comparison and headline KPIs use successful selected-country responses; an error for one zone no longer hides the others.
 - Dashboard country, period, and source selections are encoded in the URL so selected views can be shared and restored.
 - Offline Node.js tests cover dashboard demo/live rendering, health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, dashboard URL state, ENTSO-E client/parsing/normalization and private live routes, privacy-safe quality monitoring, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials are required. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
@@ -35,11 +35,12 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - Live dashboard labels identify ENTSO-E, show reported-only totals, leave missing intervals blank, and calculate renewable share from categories actually reported. Only mapped renewables enter the numerator; unknown/unclassified categories remain in the reported total and are never treated as renewable. Incomplete coverage is clearly labeled beside the percentage. Live mode is designed for the owner's private instance, not for public exposure or redistribution.
 - Live mode classifies age from the latest period end: fresh through 90 minutes, delayed through 3 hours, then stale. These provisional thresholds are documented in ADR 0005.
 - Live mode refreshes automatically every 15 minutes; the manual refresh button bypasses the five-minute memory cache. Requests remain server-side and no observations are persisted.
-- The private ENTSO-E Compose overlay runs an independent hourly quality check and appends metadata-only records to a persistent host-mounted JSONL log. The dashboard displays rolling 24-hour success, freshness, raw interval coverage, mature interval coverage after the H+1 publication grace window, pending recent intervals, failure classifications, and sparse category summaries. Production quantities and credentials are not logged.
+- The private ENTSO-E Compose overlay runs an independent hourly HU-only quality check and appends metadata-only records to a persistent host-mounted JSONL log. The dashboard labels this history as HU-only and displays rolling 24-hour success, freshness, raw interval coverage, mature interval coverage after the H+1 publication grace window, pending recent intervals, failure classifications, and sparse category summaries. Production quantities and credentials are not logged.
 - The private live container is running on the OMV host and is healthy. The owner confirmed dashboard access over the home LAN. The first background check succeeded: 96/96 intervals had at least one reported category; B05, B06, and B09 were flagged by the heuristic sparse-category check. This is an initial sample, not a multi-day conclusion.
 - OMV follow-up (2026-11-21): quality history shows successful checks interspersed with failures; one success had 94/96 intervals. A direct HU latest-data request returned HTTP 200 and fresh ENTSO-E data, while container logs contained only the startup line. The mounted token file is readable and non-empty. Historical failure causes remain unknown. The old normalizer rejected negative values for every category; ENTSO-E permits negative B10 pumped-storage values while pumping, so this was a possible code-level failure source, not a confirmed explanation. New builds persist only bounded failure classifications for future checks. Sparse B05/B06/B09 flags are heuristic category-frequency signals, not evidence by themselves of absent-data errors.
 - Local pre-OMV validation (2026-11-21): `npm run check`, `npm test` (41/41), and `git diff --check` passed. Compose overlay validation could not run because the local environment has no Docker CLI; no Docker package was installed.
 - Local iteration (2026-11-21): live renewable share reports the share of observed category totals even when coverage is incomplete; mapped renewable categories only enter the numerator, with B17/unknown included only in the denominator. Dashboard marks the result as reported-only. A three-hour metadata-only API check returned data for 20 configured one-zone countries, including PT60M for Belgium, Portugal, Latvia, and Switzerland; Bulgaria and Great Britain returned no series and remain disabled. The app's own 24-hour adapter successfully normalized all 20 zones without interpolation. `npm run check` and `npm test` pass (43/43).
+- V1 readiness work: country series load independently and the dashboard reports failed selections while continuing to show successful countries. The public summary API returns partial results plus safe per-country error classifications. The monitoring panel and API explicitly identify HU as the only background-monitored zone. Validation: `npm run check`, `npm test` (44/44), and `git diff --check` passed.
 
 ## External dependency backlog
 
@@ -50,6 +51,15 @@ GridPulse Europe is a public, self-hosted analytics application for recent elect
 - After the next OMV update, review whether B10 appears, whether negative values occur, and whether the hourly check now succeeds; do not infer historic causes from the old log.
 - Obtain written reuse clarification before exposing live data to other users or publishing API results or derived data.
 
-## Immediate next task
+## V1 acceptance checklist
 
-Review the local changes, push them, then update OMV and owner-check live availability for a few additional configured countries. Review several days of quality history with bounded failure classifications and publication-window-aware interval coverage. Before sharing or publishing results, obtain written reuse clarification for item 16.1.B&C.
+- [x] 20 configured single zones returned and normalized live data in a 24-hour validation run; hourly data remains hourly.
+- [x] Partial country failures do not hide available dashboard data; API errors are country-scoped and sanitized.
+- [x] Renewable share is labeled as reported-category share when coverage is incomplete; unknown categories are never treated as renewable.
+- [x] OMV live deployment and 20-country list were confirmed by the owner.
+- [x] HU-only scope is explicit for persistent quality monitoring.
+- [ ] Observe the HU quality log over several days and confirm stable checks, mature coverage, and restart persistence.
+- [ ] Run an OMV browser acceptance pass with a 15-minute country, an hourly country, and a three-country comparison after deploying this V1 candidate.
+- [ ] Cut and publish the `v1.0.0` GitHub release after acceptance.
+
+Public exposure or publication of live data/derived results remains outside V1 pending rights clarification. Historical source-data persistence and multi-zone aggregation are also deferred.

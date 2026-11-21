@@ -17,7 +17,7 @@ class MockElement {
   querySelectorAll() { return []; }
 }
 
-async function renderApp({ provider, freshness, includePumping = false }) {
+async function renderApp({ provider, freshness, includePumping = false, failedCountry = null }) {
   const elements = new Map();
   const element = (selector) => {
     if (!elements.has(selector)) elements.set(selector, new MockElement());
@@ -25,7 +25,7 @@ async function renderApp({ provider, freshness, includePumping = false }) {
   };
   globalThis.document = { querySelector: element };
   globalThis.window = {
-    location: { href: `http://localhost/${includePumping ? '?sources=solar,hydro_pumped_storage' : ''}`, search: includePumping ? '?sources=solar,hydro_pumped_storage' : '', pathname: '/' },
+    location: { href: `http://localhost/${failedCountry ? '?countries=HU,AT' : includePumping ? '?sources=solar,hydro_pumped_storage' : ''}`, search: failedCountry ? '?countries=HU,AT' : includePumping ? '?sources=solar,hydro_pumped_storage' : '', pathname: '/' },
     history: { replaceState() {} }
   };
   globalThis.setInterval = () => 1;
@@ -54,8 +54,10 @@ async function renderApp({ provider, freshness, includePumping = false }) {
     }
   };
   const payloads = {
-    '/api/v1/countries': { countries: [{ code: 'HU', name: 'Hungary', provider_zone_code: summaryItem.provider_zone_code }] },
-    '/api/v1/dashboard/summary?countries=HU': { summary: [summaryItem] },
+    '/api/v1/countries': { countries: [
+      { code: 'HU', name: 'Hungary', provider_zone_code: summaryItem.provider_zone_code },
+      { code: 'AT', name: 'Austria', provider_zone_code: '10YAT-APG------L' }
+    ] },
     '/api/v1/countries/HU/generation-mix': {
       country: { code: 'HU', name: 'Hungary', provider_zone_code: summaryItem.provider_zone_code },
       source: summaryItem.source,
@@ -83,8 +85,13 @@ async function renderApp({ provider, freshness, includePumping = false }) {
       }
     } } : undefined
   };
-  globalThis.fetch = async (path) => ({ ok: true, json: async () => payloads[path] });
-  await import(`../public/app.js?ui-${provider}-${freshness}`);
+  globalThis.fetch = async (path) => {
+    if (failedCountry && path.includes(`/countries/${failedCountry}/generation-mix`)) {
+      return { ok: false, status: 502, json: async () => ({ error: { message: 'Live ENTSO-E data is temporarily unavailable.' } }) };
+    }
+    return { ok: true, json: async () => payloads[path] };
+  };
+  await import(`../public/app.js?ui-${provider}-${freshness}-${failedCountry ?? 'none'}-${includePumping}`);
   for (let attempt = 0; attempt < 50 && (element('#dashboard-content').getAttribute('aria-busy') !== 'false'
     || (includePumping && element('#quality-monitor').hidden)); attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -118,4 +125,13 @@ test('dashboard renders negative pumped-storage values in the signed chart and s
   assert.match(live.get('#quality-stats').innerHTML, /92\/92/);
   assert.match(live.get('#quality-pending').textContent, /4 recent intervals.*2 already have data.*0 intervals older/);
   assert.match(live.get('#quality-failures').textContent, /HTTP_503 \(1\)/);
+});
+
+test('dashboard keeps available countries visible when one selected country fails', async () => {
+  const partial = await renderApp({ provider: 'entsoe', freshness: 'fresh', failedCountry: 'AT' });
+  assert.equal(partial.get('#dashboard-content').getAttribute('aria-busy'), 'false');
+  assert.equal(partial.get('#country-load-errors').hidden, false);
+  assert.match(partial.get('#country-load-errors').textContent, /Austria.*Showing available countries/);
+  assert.match(partial.get('#comparison-list').innerHTML, /Hungary/);
+  assert.doesNotMatch(partial.get('#comparison-list').innerHTML, /Austria/);
 });

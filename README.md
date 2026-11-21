@@ -11,7 +11,7 @@ The app has two modes:
 
 The live zone list is Hungary (HU), Austria (AT), Germany-Luxembourg (DE-LU), Netherlands (NL), Poland (PL), Czechia (CZ), Slovakia (SK), Slovenia (SI), Croatia (HR), Romania (RO), Greece (GR), France (FR), Belgium (BE), Spain (ES), Portugal (PT), Finland (FI), Lithuania (LT), Latvia (LV), Estonia (EE), and Switzerland (CH). Countries with multiple bidding zones are not yet aggregated.
 
-The dashboard compares up to three selected countries, supports 6/12/24-hour windows and source filters, and keeps country, period, and source selections in the URL. Missing periods remain blank; they are never filled with zero. Freshness is based on the latest reported market period.
+The dashboard compares up to three selected countries, supports 6/12/24-hour windows and source filters, and keeps country, period, and source selections in the URL. Each selected country is fetched independently, so an unavailable zone does not hide successful countries; the dashboard names partial failures. Missing periods remain blank; they are never filled with zero. Freshness is based on the latest reported market period.
 
 ## Renewable share and coverage
 
@@ -52,7 +52,7 @@ GRIDPULSE_DATA_SOURCE=entsoe \
   npm start
 ```
 
-The API token stays server-side. Live observations are cached in memory for five minutes and are not persisted. The dashboard refreshes every 15 minutes; manual refresh bypasses the cache. The separate hourly quality check records metadata only in a host-mounted JSONL log. By default it records check outcomes, freshness, reported and mature interval coverage, pending intervals, bounded failure codes, and category IDs. It does not record production quantities, provider response text, exception messages, or credentials.
+The API token stays server-side. Live observations are cached in memory for five minutes and are not persisted. The dashboard refreshes every 15 minutes; manual refresh bypasses the cache. The separate hourly quality check currently monitors HU only and records metadata in a host-mounted JSONL log. It records check outcomes, freshness, reported and mature interval coverage, pending intervals, bounded failure codes, and category IDs. It does not record production quantities, provider response text, exception messages, or credentials.
 
 The app has no login. Keep live mode on a trusted home network, do not forward its port to the public internet, and do not expose it to users outside your control. ENTSO-E API access does not itself establish public redistribution rights for this data item. The repo documents current source and reuse findings in [docs/data-sources.md](docs/data-sources.md); get written rights clarification before public exposure or publication of data or derived results.
 
@@ -80,7 +80,7 @@ The container runs as a non-root user with a read-only root filesystem, dropped 
 - `GET /health/ready`
 - `GET /api/v1/countries` — returns the three demo countries or the configured live zones, depending on mode
 - `GET /api/v1/categories`
-- `GET /api/v1/dashboard/summary?countries=HU,AT` — accepts one to three supported countries
+- `GET /api/v1/dashboard/summary?countries=HU,AT` — accepts one to three supported countries; live responses include available `summary` rows, a `partial` flag, and safe per-country `errors`
 - `GET /api/v1/countries/{code}/generation-mix`
 - `GET /api/v1/countries/{code}/generation-mix/latest`
 - `GET /api/v1/monitoring/quality` — available only when live quality monitoring is enabled
