@@ -22,7 +22,7 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - Offline Node.js tests cover dashboard demo/live rendering, health, country/zone metadata, observation validation, UTC/unit/synthetic contracts, taxonomy, renewable-share completeness and arithmetic, freshness classification, dashboard URL state, ENTSO-E client/parsing/normalization and private live routes, privacy-safe quality monitoring, input validation, and static asset delivery.
 - No third-party runtime dependencies or provider credentials are required. A GitHub Actions CI matrix targets Node.js 20, 22, and 24 with read-only repository permissions.
 - GitHub Actions has successfully checked the dashboard and container build, using a Node.js 20/22/24 test matrix.
-- Dockerfile and Compose configuration now package the fixture-only demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. GitHub Actions builds the container image. No data volume is configured before persistence exists.
+- Dockerfile and Compose configuration package the default fixture demo with a non-root user, read-only filesystem, dropped Linux capabilities, health check, and loopback-only default binding. The optional live overlay mounts a separate metadata-only quality log; source observations are not persisted. GitHub Actions builds the container image.
 - Current ENTSO-E data-source findings and reuse terms are recorded in [data-sources.md](data-sources.md). The owner has authorized access and validated short HU requests. Private live mode is enabled by explicit configuration; sharing/publishing remains gated on reuse clarification and coverage policy.
 - A separate manual ENTSO-E validation script sends a short HU request and reports only response metadata/category identifiers. It does not log response values or persist data. The token is read server-side from `ENTSOE_API_TOKEN` or `ENTSOE_API_TOKEN_FILE`; the default demo container receives no token.
 - Dashboard URL state parsing and serialization live in a dependency-free browser module and are covered by offline tests for defaults, valid and invalid links, and serialization.
@@ -41,6 +41,7 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - Local pre-OMV validation (2026-11-21): `npm run check`, `npm test` (41/41), and `git diff --check` passed. Compose overlay validation could not run because the local environment has no Docker CLI; no Docker package was installed.
 - Local iteration (2026-11-21): live renewable share reports the share of observed category totals even when coverage is incomplete; mapped renewable categories only enter the numerator, with B17/unknown included only in the denominator. Dashboard marks the result as reported-only. A three-hour metadata-only API check returned data for 20 configured one-zone countries, including PT60M for Belgium, Portugal, Latvia, and Switzerland; Bulgaria and Great Britain returned no series and remain disabled. The app's own 24-hour adapter successfully normalized all 20 zones without interpolation. `npm run check` and `npm test` pass (43/43).
 - V1 readiness work: country series load independently and the dashboard reports failed selections while continuing to show successful countries. The public summary API returns partial results plus safe per-country error classifications. The monitoring panel and API explicitly identify HU as the only background-monitored zone. Validation: `npm run check`, `npm test` (44/44), and `git diff --check` passed.
+- OMV V1 test (owner-confirmed): the latest container is `healthy`; the HU–BE–AT comparison returned HTTP 200 with `partial: false` and no country errors. HU and AT returned 96 PT15M intervals, BE returned 24 PT60M intervals, and the quality-monitor API identifies HU as its monitored country. V1 remains under test pending multi-day quality-log stability and restart-persistence review.
 
 ## External dependency backlog
 
@@ -48,7 +49,7 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - Review mature vs pending coverage in future quality logs to determine whether the observed 94/96 gaps were within the H+1 publication window; verify request-window boundaries over longer samples.
 - Review the sparse-category heuristic and how the UI explains B05/B06/B09; do not assume low output means missing data or assume an omitted point means zero.
 - B17 waste classification remains deliberately unresolved at the domain level because the source code alone does not identify renewable vs non-renewable feedstock.
-- After the next OMV update, review whether B10 appears, whether negative values occur, and whether the hourly check now succeeds; do not infer historic causes from the old log.
+- During the current OMV V1 test, review whether B10 appears, whether negative values occur, and whether the hourly HU quality check remains stable; do not infer historic causes from old log rows.
 - Obtain written reuse clarification before exposing live data to other users or publishing API results or derived data.
 
 ## V1 acceptance checklist
@@ -56,10 +57,10 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - [x] 20 configured single zones returned and normalized live data in a 24-hour validation run; hourly data remains hourly.
 - [x] Partial country failures do not hide available dashboard data; API errors are country-scoped and sanitized.
 - [x] Renewable share is labeled as reported-category share when coverage is incomplete; unknown categories are never treated as renewable.
-- [x] OMV live deployment and 20-country list were confirmed by the owner.
+- [x] OMV live deployment is healthy and the countries endpoint returns all 20 configured zones.
 - [x] HU-only scope is explicit for persistent quality monitoring.
+- [x] Owner confirmed HU–BE–AT works on OMV; API check returned 96 PT15M HU/AT intervals, 24 PT60M BE intervals, and no partial-country errors.
 - [ ] Observe the HU quality log over several days and confirm stable checks, mature coverage, and restart persistence.
-- [ ] Run an OMV browser acceptance pass with a 15-minute country, an hourly country, and a three-country comparison after deploying this V1 candidate.
 - [ ] Cut and publish the `v1.0.0` GitHub release after acceptance.
 
 Public exposure or publication of live data/derived results remains outside V1 pending rights clarification. Historical source-data persistence and multi-zone aggregation are also deferred.

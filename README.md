@@ -4,6 +4,8 @@ A self-hosted dashboard for recent electricity generation by source. It displays
 
 ## Current status
 
+**V1 is under test on the private OMV instance; no `v1.0.0` release has been cut.** The owner confirmed the HU–BE–AT comparison is working. The OMV container reports healthy; the three-country API response returned HTTP 200 with no partial errors. HU and AT returned 96 fifteen-minute intervals, while BE returned 24 hourly intervals. The background quality monitor checks HU only. The remaining release gate is multi-day quality-log stability and restart persistence.
+
 The app has two modes:
 
 - **Demo (default):** synthetic HU, AT, and DE fixtures; no credentials or external runtime requests. Fixture values are illustrative only, not official or observed data.
