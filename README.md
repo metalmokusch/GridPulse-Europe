@@ -4,7 +4,7 @@ A self-hosted dashboard for recent electricity generation by source. It displays
 
 ## Current status
 
-**V1 is under test on the private OMV instance; no `v1.0.0` release has been cut.** The owner confirmed the HU–BE–AT comparison is working. The OMV container reports healthy; the three-country API response returned HTTP 200 with no partial errors. HU and AT returned 96 fifteen-minute intervals, while BE returned 24 hourly intervals. The background quality monitor checks HU only. The remaining release gate is multi-day quality-log stability and restart persistence.
+**V1.0.0 is ready for private self-hosted use on the owner's OMV instance.** The owner confirmed the HU–BE–AT comparison is working. The OMV container reports healthy; the three-country API response returned HTTP 200 with no partial errors. HU and AT returned 96 fifteen-minute intervals, while BE returned 24 hourly intervals. The HU-only quality monitor reported 25/25 successful checks over the rolling 24-hour window, 0 failures, and 100% mature interval coverage. After a container restart, the history remained available and the next check succeeded. This release is intended for the owner's private instance, not public redistribution of live data or derived results.
 
 The app has two modes:
 

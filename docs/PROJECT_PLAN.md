@@ -11,7 +11,7 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 3. **Bootstrap demo-first vertical slice:** complete. API health/readiness, synthetic fixture data, and a responsive dashboard with explicit time/unit/status and tabular fallback run without external credentials.
 4. **Build data contracts and persistence:** provider-neutral UTC observation validation, versioned taxonomy, safe renewable-share calculation, and configurable freshness classifier are implemented and covered by offline tests. Country/zone distinction is preserved. A single-instance SQLite persistence boundary is the provisional direction; package choice, migrations, adapter-owned category maps, and idempotent storage remain open (see ADR 0004).
 5. **Add provider adapter:** access and HU query behavior are validated. Private live mode is opt-in, server-side, and non-persistent. A configured EIC list exposes 20 verified-in-sample single bidding zones; Germany uses DE-LU and must be described as a combined zone. The adapter preserves either PT15M or PT60M periods and rejects mixed/unsupported resolutions. Wider exposure still requires written reuse clarification.
-6. **Complete analytics and operations:** the responsive dashboard, Compose deployment, independent per-country failure display, and initial OMV validation are complete. HU-only multi-day feed monitoring is underway. Historical analytics, persistence of source observations, backup/restore, authentication, public exposure, and broader security review are outside the private-LAN V1 scope.
+6. **Complete analytics and operations:** the responsive dashboard, Compose deployment, independent per-country failure display, and private OMV validation are complete. HU-only quality history is persisted to a host-mounted volume. Historical analytics, persistence of source observations, backup/restore, authentication, public exposure, and broader security review are outside the private-LAN V1 scope.
 
 ## Current state
 
@@ -42,6 +42,9 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - Local iteration (2026-11-21): live renewable share reports the share of observed category totals even when coverage is incomplete; mapped renewable categories only enter the numerator, with B17/unknown included only in the denominator. Dashboard marks the result as reported-only. A three-hour metadata-only API check returned data for 20 configured one-zone countries, including PT60M for Belgium, Portugal, Latvia, and Switzerland; Bulgaria and Great Britain returned no series and remain disabled. The app's own 24-hour adapter successfully normalized all 20 zones without interpolation. `npm run check` and `npm test` pass (43/43).
 - V1 readiness work: country series load independently and the dashboard reports failed selections while continuing to show successful countries. The public summary API returns partial results plus safe per-country error classifications. The monitoring panel and API explicitly identify HU as the only background-monitored zone. Validation: `npm run check`, `npm test` (44/44), and `git diff --check` passed.
 - OMV V1 test (owner-confirmed): the latest container is `healthy`; the HU–BE–AT comparison returned HTTP 200 with `partial: false` and no country errors. HU and AT returned 96 PT15M intervals, BE returned 24 PT60M intervals, and the quality-monitor API identifies HU as its monitored country. V1 remains under test pending multi-day quality-log stability and restart-persistence review.
+- OMV quality review (owner-provided, 2026-11-22): the rolling 24-hour monitor window contained 25 checks, 25 successes, 0 failures, 98% mean raw interval coverage, and 100% mean mature interval coverage. The latest check observed 94/96 intervals; 92/92 mature intervals were present, with 2/4 recent pending intervals observed. B05/B06/B09 were flagged by the sparse-category heuristic. The owner had not restarted the container, so restart persistence was not directly exercised; the Compose overlay stores the JSONL history on a host-mounted directory.
+- OMV restart check (owner-provided, 2026-11-22): after restarting the app container, quality history advanced from 25 to 26 checks, all successful, with no failures; mature interval coverage remained 100% (92/92). Existing history therefore survived this container restart.
+- Local V1 release-gate validation (2026-11-22): `npm run check`, `npm test` (44/44), and `git diff --check` passed. The owner confirmed the release is for private self-hosted use on their OMV instance.
 
 ## External dependency backlog
 
@@ -60,7 +63,9 @@ GridPulse Europe is a self-hosted analytics application for recent electricity g
 - [x] OMV live deployment is healthy and the countries endpoint returns all 20 configured zones.
 - [x] HU-only scope is explicit for persistent quality monitoring.
 - [x] Owner confirmed HU–BE–AT works on OMV; API check returned 96 PT15M HU/AT intervals, 24 PT60M BE intervals, and no partial-country errors.
-- [ ] Observe the HU quality log over several days and confirm stable checks, mature coverage, and restart persistence.
-- [ ] Cut and publish the `v1.0.0` GitHub release after acceptance.
+- [x] Review HU quality history: 25/25 successes, no failures, and 100% mature coverage in the submitted rolling 24-hour sample.
+- [x] Confirm the Compose configuration stores quality history on a host-mounted volume.
+- [x] Directly verify quality history survives an OMV container restart; the next quality check succeeded.
+- [x] Complete V1 acceptance for private self-hosted use; prepare the `v1.0.0` release.
 
-Public exposure or publication of live data/derived results remains outside V1 pending rights clarification. Historical source-data persistence and multi-zone aggregation are also deferred.
+Public exposure or redistribution of live data/derived results remains outside V1. Historical source-data persistence and multi-zone aggregation are also deferred.
