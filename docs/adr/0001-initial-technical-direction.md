@@ -5,7 +5,7 @@
 
 ## Context
 
-The product specification proposes TypeScript across the web and API, a demo-first read-only MVP, SQLite for a small self-hosted installation, and a provider-neutral boundary. The ENTSO-E token, actual query coverage, data reuse terms, chart library, and target OMV environment remain unvalidated.
+The product specification proposes TypeScript across the web and API, a demo-first read-only MVP, SQLite for a small self-hosted installation, and a provider-neutral boundary. The ENTSO-E token, actual query coverage, data reuse terms, chart library, and target self-hosted environment remain unvalidated.
 
 ## Decision
 

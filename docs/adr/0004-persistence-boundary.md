@@ -26,7 +26,7 @@ The likely first deployment is a single self-hosted instance. Its actual host, c
 
 ## Follow-up requirements before implementation
 
-1. Confirm the target OMV host's architecture, supported Node.js/container version, and persistent local volume path.
+1. Confirm the target host's architecture, supported Node.js/container version, and persistent local volume path.
 2. Decide the minimum supported Node.js version and choose a maintained SQLite driver compatible with it; review native build/runtime requirements before adding a dependency.
 3. Define a stable record identity over provider, dataset, source zone, source category, period, unit, and relevant status/version fields. Ensure re-fetches do not duplicate observations and corrections can be represented.
 4. Specify UTC storage, migration rollback/recovery behavior, retention, and a tested backup/restore procedure.

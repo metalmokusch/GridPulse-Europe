@@ -5,7 +5,7 @@
 
 ## Context
 
-The ENTSO-E live mode needs multi-day observation on the owner's OMV host. The dashboard should retain enough history to review availability, freshness, interval coverage, and sparse source categories without storing provider values.
+The ENTSO-E live mode needs multi-day observation on a private self-hosted deployment. The dashboard should retain enough history to review availability, freshness, interval coverage, and sparse source categories without storing provider values.
 
 ## Decision
 
@@ -19,6 +19,6 @@ The ENTSO-E live mode needs multi-day observation on the owner's OMV host. The d
 
 ## Consequences
 
-- The owner can leave the app running on OMV and inspect accumulated quality results later without leaving a browser open.
+- The operator can leave the app running in its self-hosted environment and inspect accumulated quality results later without leaving a browser open.
 - The JSONL file is local operational metadata and must stay outside Git and public distribution.
 - This monitoring does not establish data reuse rights or complete category coverage.
